@@ -1,0 +1,38 @@
+name: Deploy Backend to AWS
+
+on:
+  push:
+    branches:
+      - main  # Only runs when code is pushed to main
+
+jobs:
+  deploy-lambda:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Check out your code
+      - uses: actions/checkout@v3
+
+      # 2. Set up Python (Matches your SAM runtime)
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      # 3. Set up AWS SAM CLI tool
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      # 4. Log in to AWS using your Secrets
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # 5. Build the application (Prepares the zip files)
+      - run: sam build
+
+      # 6. Deploy to AWS
+      # --no-confirm-changeset: Don't ask for "Yes/No", just do it.
+      # --no-fail-on-empty-changeset: If nothing changed, don't crash.
+      - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
