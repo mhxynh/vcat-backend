@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   vcat-backend
@@ -21,12 +21,102 @@ Resources:
       Handler: app.lambda_handler
       Runtime: python3.12
       Architectures:
-      - x86_64
+        - x86_64
       Events:
         ControlsApi:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /controls
+            Method: get
+
+  CatalogFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/catalog/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        CatalogApi:
+          Type: Api
+          Properties:
+            Path: /catalog
+            Method: get
+
+  RequestsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/requests/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        RequestsApi:
+          Type: Api
+          Properties:
+            Path: /requests
+            Method: get
+
+  CommentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/comments/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        CommentsApi:
+          Type: Api
+          Properties:
+            Path: /comments
+            Method: get
+
+  AuditFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/audit/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        AuditApi:
+          Type: Api
+          Properties:
+            Path: /audit
+            Method: get
+
+  ExportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/exporting/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        ExportApi:
+          Type: Api
+          Properties:
+            Path: /export
+            Method: get
+
+  NotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/notifications/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        NotificationsApi:
+          Type: Api
+          Properties:
+            Path: /notifications
             Method: get
 
   ApplicationResourceGroup:
@@ -41,13 +131,13 @@ Resources:
     Properties:
       ResourceGroupName:
         Ref: ApplicationResourceGroup
-      AutoConfigurationEnabled: 'true'
+      AutoConfigurationEnabled: "true"
 # Outputs:
 #   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
 #   # Find out more about other implicit resources you can reference within SAM
 #   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
 #   HelloWorldApi:
-#     Description: API Gateway endpoint URL for Prod stage for Hello World 
+#     Description: API Gateway endpoint URL for Prod stage for Hello World
 #       function
 #     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/hello/"
 #   HelloWorldFunction:
