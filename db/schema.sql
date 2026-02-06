@@ -113,4 +113,15 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     after_snapshot  JSONB,
     changed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     reason          TEXT
-)
+);
+
+CREATE TABLE IF NOT EXISTS versions (
+    version_id      BIGSERIAL PRIMARY KEY,
+    entity_type     auditable_entity NOT NULL,
+    entity_id       BIGINT NOT NULL,
+    version_number  BIGINT NOT NULL,
+    snapshot        JSONB NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_by      BIGINT REFERENCES users(user_id),
+    CONSTRAINT versions_unique UNIQUE (entity_type, entity_id, version_number)
+);
