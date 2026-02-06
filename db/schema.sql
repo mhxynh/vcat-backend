@@ -70,3 +70,22 @@ CREATE TABLE IF NOT EXISTS requests (
     created_by      BIGINT REFERENCES users(user_id), --I'm thinking of add this because would be good for audit tracker
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS tests (
+    test_id             BIGSERIAL PRIMARY KEY,
+    request_id          BIGINT NOT NULL REFERENCES request_id(request_id) NO DELETE CASCADE,
+    control_id          BIGINT NOT NULL REFERENCES controls(control_id),
+    test_track          test_track NOT NULL
+    assigned_tester_id  BIGINT REFERENCES users(user_id),
+    description         TEXT,
+    start_date          DATE,
+    estimated_date      DATE,
+    complete_date       DATE,
+    in_progress_step    TEXT,
+    status              test_status NOT NULL DEFAULT 'NO_STARTED',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id, test_track)
+);
+
+
