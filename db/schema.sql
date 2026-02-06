@@ -88,4 +88,17 @@ CREATE TABLE IF NOT EXISTS tests (
     CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id, test_track)
 );
 
+CREATE TABLE IF NOT EXISTS comments (
+    comment_id          BIGSERIAL PRIMARY KEY,
+    author_user_id      BIGINT NOT NULL REFERENCES users(user_id),
+    test_id             BIGINT REFERENCES tests(test_id) ON DELETE CASCADE,
+    request_id          BIGINT REFERENCES requests(request_id) ON DELETE CASCADE,
+    comment_text        TEXT NOT NULL,
+    posted_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT  comments_target_chk CHECK (
+        (test_id IS NOT NULL AND request_id IS NULL)
+        OR
+        (test_id IS NOT NULL and request_id IS NOT NULL)
+    )
+);
 
