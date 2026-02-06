@@ -48,5 +48,14 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS controls (
-    control_id      
-)
+    control_id      BIGSERIAL PRIMARY KEY,
+    vgcpid          VARCHAR(50) UNIQUE NOT NULL,
+    title           TEXT NOT NULL, 
+    description     TEXT,
+    control_owner   TEXT,
+    control_sme     TEXT,
+    escalation      BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    data_created    DATE NOT NULL DEFAULT current_date,
+    last_tested     DATE
+);
