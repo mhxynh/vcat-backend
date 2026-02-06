@@ -39,5 +39,14 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ---------- TABLES ----------
 CREATE TABLE IF NOT EXISTS users (
-    
+    user_id         BIGSERIAL PRIMARY KEY,
+    email           VARCHAR(255) UNIQUE NOT NULL,
+    role            user_role NOT NULL,
+    display_name    TEXT,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS controls (
+    control_id      
 )
