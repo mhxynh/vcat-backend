@@ -125,3 +125,16 @@ CREATE TABLE IF NOT EXISTS versions (
     created_by      BIGINT REFERENCES users(user_id),
     CONSTRAINT versions_unique UNIQUE (entity_type, entity_id, version_number)
 );
+
+---------- INDEXES ----------
+CREATE INDEX IF NOT EXISTS idx_tests_request ON tests(request_id);
+CREATE INDEX IF NOT EXISTS idx_tests_control ON tests(control_id);
+CREATE INDEX IF NOT EXISTS idx_tests_track ON tests(test_track);
+CREATE INDEX IF NOT EXISTS idx_tests_assigned ON tests(assigned_tester_id);
+CREATE INDEX IF NOT EXISTS idx_comments_test ON comments(test_id);
+CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_user_id);
+CREATE INDEX IF NOT EXISTS idx_versions_entity ON versions(entity_type, entity_id);
+
+COMMIT;
