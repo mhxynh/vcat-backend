@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS requests (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Tests are per (request, control, track)
 CREATE TABLE IF NOT EXISTS tests (
     test_id             BIGSERIAL PRIMARY KEY,
     request_id          BIGINT NOT NULL REFERENCES request_id(request_id) NO DELETE CASCADE,
@@ -102,3 +103,14 @@ CREATE TABLE IF NOT EXISTS comments (
     )
 );
 
+CREATE TABLE IF NOT EXISTS audit_logs (
+    audit_id        BIGSERIAL PRIMARY KEY,
+    actor_user_id   BIGINT  REFERENCES users(user_id),
+    entity_type     auditable_entity NOT NULL,
+    entity_id       BIGINT NOT NULL
+    action          audit_action NOT NULL,
+    before_snapshot JSONB,
+    after_snapshot  JSONB,
+    changed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reason          TEXT
+)
