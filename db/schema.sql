@@ -59,3 +59,14 @@ CREATE TABLE IF NOT EXISTS controls (
     data_created    DATE NOT NULL DEFAULT current_date,
     last_tested     DATE
 );
+
+CREATE TABLE IF NOT EXISTS requests (
+    request_id      BIGSERIAL PRIMARY KEY,
+    requestor       TEXT,
+    start_date      DATE,
+    due_date        DATE,
+    complete_date   DATE,
+    status          request_status NOT NULL DEFAULT 'NOT_STARTED'
+    created_by      BIGINT REFERENCES users(user_id), --I'm thinking of add this because would be good for audit tracker
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
