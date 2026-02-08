@@ -66,24 +66,24 @@ CREATE TABLE IF NOT EXISTS requests (
     start_date      DATE,
     due_date        DATE,
     complete_date   DATE,
-    status          request_status NOT NULL DEFAULT 'NOT_STARTED'
-    created_by      BIGINT REFERENCES users(user_id), --I'm thinking of add this because would be good for audit tracker
+    status          request_status NOT NULL DEFAULT 'NOT_STARTED',
+    created_by      BIGINT REFERENCES users(user_id), 
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Tests are per (request, control, track)
 CREATE TABLE IF NOT EXISTS tests (
     test_id             BIGSERIAL PRIMARY KEY,
-    request_id          BIGINT NOT NULL REFERENCES request_id(request_id) NO DELETE CASCADE,
+    request_id          BIGINT NOT NULL REFERENCES requests(request_id) ON DELETE CASCADE,
     control_id          BIGINT NOT NULL REFERENCES controls(control_id),
-    test_track          test_track NOT NULL
+    test_track          test_track NOT NULL,
     assigned_tester_id  BIGINT REFERENCES users(user_id),
     description         TEXT,
     start_date          DATE,
     estimated_date      DATE,
     complete_date       DATE,
     in_progress_step    TEXT,
-    status              test_status NOT NULL DEFAULT 'NO_STARTED',
+    status              test_status NOT NULL DEFAULT 'NOT_STARTED',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id, test_track)
@@ -97,9 +97,7 @@ CREATE TABLE IF NOT EXISTS comments (
     comment_text        TEXT NOT NULL,
     posted_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT  comments_target_chk CHECK (
-        (test_id IS NOT NULL AND request_id IS NULL)
-        OR
-        (test_id IS NOT NULL and request_id IS NOT NULL)
+        test_id IS NOT NULL OR request_id IS NOT NULL
     )
 );
 
@@ -107,7 +105,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     audit_id        BIGSERIAL PRIMARY KEY,
     actor_user_id   BIGINT  REFERENCES users(user_id),
     entity_type     auditable_entity NOT NULL,
-    entity_id       BIGINT NOT NULL
+    entity_id       BIGINT NOT NULL,
     action          audit_action NOT NULL,
     before_snapshot JSONB,
     after_snapshot  JSONB,
