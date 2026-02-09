@@ -14,8 +14,8 @@ set -euo pipefail
 # Defaults (can be overridden by flags)
 DB_URL="${DB_URL:-postgres://postgres:postgres@localhost:5432/vcatdb}"
 
-USERS="${USERS:-1}"
-MANAGERS="${MANAGERS:-1}"
+USERS="${USERS:-5}"
+MANAGERS="${MANAGERS:-2}"
 CONTROLS="${CONTROLS:-11}"
 REQUESTS="${REQUESTS:-$CONTROLS}"
 COMMENTS_PER_REQUEST="${COMMENTS_PER_REQUEST:-2}"
@@ -104,6 +104,6 @@ psql "$DB_URL" \
   -v REQUESTS="$REQUESTS" \
   -v COMMENTS_PER_REQUEST="$COMMENTS_PER_REQUEST" \
   -v ESCALATION_EVERY="$ESCALATION_EVERY" \
-  -f db/seed.sql
+  -f db/seed.sql # change this between the two seed files
 
 echo "Done."
