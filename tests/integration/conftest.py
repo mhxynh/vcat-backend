@@ -3,6 +3,7 @@ import uuid
 import pathlib
 import psycopg2
 import pytest
+import re
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "db" / "schema.sql"
@@ -38,12 +39,30 @@ def _with_db_name(dsn: str, dbname: str) -> str:
     return "/".join(parts)
 
 def _exec_sql_file(conn, path: pathlib.Path):
+    
     sql = path.read_text(encoding="utf-8")
+    
+    # Extract psql variables from \set statements
+    variables = {}
+    for match in re.finditer(r'\\set\s+(\w+)\s+(.+?)(?=\s|$)', sql):
+        var_name = match.group(1)
+        var_value = match.group(2).strip("'\"")
+        variables[var_name] = var_value
+    
+    # Remove psql meta-commands (lines starting with \)
+    lines = [line for line in sql.split('\n') if not line.strip().startswith('\\')]
+    sql = '\n'.join(lines)
+    
+    # Replace psql variables with their values (multiple passes to handle variable references)
+    for _ in range(len(variables)):
+        for var_name, var_value in variables.items():
+            sql = sql.replace(f':{var_name}', var_value)
+    
     with conn.cursor() as cur:
         cur.execute(sql)
     conn.commit()
 
-@pytest.fixure(scope="session")
+@pytest.fixture(scope="session")
 def test_db_url():
     admin_dsn = _get_admin_dsn()
     temp_db_name = f"vcat_test_{uuid.uuid4().hex[:12]}"
