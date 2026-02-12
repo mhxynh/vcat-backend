@@ -4,10 +4,14 @@ import pathlib
 import psycopg2
 import pytest
 import re
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-SCHEMA_PATH = REPO_ROOT / "db" / "schema.sql"
-SEED_PATH = REPO_ROOT / "db" / "seed.sql"
+SCHEMA_PATH = REPO_ROOT / "database" / "schema.sql"
+SEED_PATH = REPO_ROOT / "database" / "seed.sql"
 
 def _get_admin_dsn() -> str:
     """

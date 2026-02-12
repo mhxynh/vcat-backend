@@ -13,7 +13,7 @@ class TestSchema:
             WHERE table_schema = 'public'
             """        )
             tables = {row[0] for row in cur.fetchall()}
-        expected_tables = {"audit_logs", "comments", "controls", "users", "tests", "requests", "versions" }
+        expected_tables = {"audit_logs", "comments", "controls", "users", "tests", "requests"}
         assert expected_tables.issubset(tables), f"Expected tables {expected_tables} not all found in database. Found tables: {tables}"
 
     def test_users_table_structure(self, db_conn):
@@ -76,9 +76,9 @@ class TestSchema:
                 SELECT typname
                 FROM pg_type
                 WHERE typtype = 'e'
-                AND typname IN ('user_role', 'request_status', 'test_status', 'test_track', 'audit_action', 'auditable_entity')
+                AND typname IN ('user_role', 'request_status', 'test_status', 'test_type', 'audit_action', 'auditable_entity', 'test_progress_step')
             """)
             enums = {row[0] for row in cur.fetchall()}
         
-        expected_enums = {'user_role', 'request_status', 'test_status', 'test_track', 'audit_action', 'auditable_entity'}
+        expected_enums = {'user_role', 'request_status', 'test_status', 'test_type', 'audit_action', 'auditable_entity', 'test_progress_step'}
         assert expected_enums.issubset(enums), f"Missing enums: {expected_enums - enums}"

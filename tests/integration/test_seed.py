@@ -47,9 +47,9 @@ class TestSeedData:
             test_count = cur.fetchone()[0]
             
             cur.execute("""
-                SELECT test_track, COUNT(*) as count
+                SELECT test_type, COUNT(*) as count
                 FROM tests
-                GROUP BY test_track
+                GROUP BY test_type
             """)
             tracks = {row[0]: row[1] for row in cur.fetchall()}
         
