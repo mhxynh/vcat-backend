@@ -8,8 +8,8 @@ set -euo pipefail
 # THEN: you can run this script. 
 
 # Usage examples:
-#   DB_URL="postgres://postgres:postgres@localhost:5432/vcatdb" ./scripts/db_reset.sh
-#   ./scripts/db_reset.sh --users 12 --managers 3 --controls 50 --requests 50 --comments-per-request 1
+#   DB_URL="postgres://postgres:postgres@localhost:5432/vcatdb" ./scripts/database_reset.sh
+#   ./scripts/database_reset.sh --users 12 --managers 3 --controls 50 --requests 50 --comments-per-request 1
 #
 # Defaults (can be overridden by flags)
 DB_URL="${DB_URL:-postgres://postgres:postgres@localhost:5432/vcatdb}"
@@ -18,7 +18,7 @@ USERS="${USERS:-5}"
 MANAGERS="${MANAGERS:-2}"
 CONTROLS="${CONTROLS:-11}"
 REQUESTS="${REQUESTS:-$CONTROLS}"
-COMMENTS_PER_REQUEST="${COMMENTS_PER_REQUEST:-2}"
+COMMENTS_PER_REQUEST="${COMMENTS_PER_REQUEST:-1}"
 ESCALATION_EVERY="${ESCALATION_EVERY:-10}"
 
 print_help() {
@@ -38,8 +38,8 @@ Flags:
   -h, --help                Show help
 
 Examples:
-  ./scripts/db_reset.sh
-  ./scripts/db_reset.sh --users 12 --controls 50 --comments-per-request 1
+  ./scripts/database_reset.sh
+  ./scripts/database_reset.sh --users 12 --controls 50 --comments-per-request 1
 EOF
 }
 
@@ -93,7 +93,7 @@ END $$;
 SQL
 
 # Recreate schema
-psql "$DB_URL" -v ON_ERROR_STOP=1 -f db/schema.sql
+psql "$DB_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
 
 # Seed with adjustable knobs (requires your refactored seed.sql using psql vars)
 psql "$DB_URL" \
@@ -104,6 +104,6 @@ psql "$DB_URL" \
   -v REQUESTS="$REQUESTS" \
   -v COMMENTS_PER_REQUEST="$COMMENTS_PER_REQUEST" \
   -v ESCALATION_EVERY="$ESCALATION_EVERY" \
-  -f db/seed.sql # change this between the two seed files
+  -f database/seed_from_tracker.sql # change this between the two seed files
 
 echo "Done."
