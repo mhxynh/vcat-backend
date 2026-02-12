@@ -12,7 +12,6 @@ BEGIN;
 
 TRUNCATE TABLE
   audit_logs,
-  versions,
   comments,
   tests,
   requests,
@@ -112,10 +111,10 @@ SELECT
   CASE WHEN p.request_status = 'COMPLETED' THEN p.complete_date ELSE NULL END,
   CASE
     WHEN p.request_status = 'NOT_STARTED' THEN NULL
-    WHEN p.request_status = 'IN_PROGRESS' THEN 'Collecting evidence'
-    WHEN p.request_status = 'IN_REVIEW' THEN 'Manager review'
-    WHEN p.request_status = 'COMPLETED' THEN 'Closed'
-    ELSE 'Blocked'
+    WHEN p.request_status = 'IN_PROGRESS' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+    WHEN p.request_status = 'IN_REVIEW' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+    WHEN p.request_status = 'COMPLETED' THEN 'COMPLETED'::test_progress_step
+    ELSE 'TESTING_BLOCKED'::test_progress_step
   END,
   CASE
     WHEN p.request_status = 'NOT_STARTED' THEN 'NOT_STARTED'::test_status
