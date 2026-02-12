@@ -125,3 +125,5 @@ CREATE INDEX IF NOT EXISTS idx_comments_test ON comments(test_id);
 CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_user_id);
+
+COMMIT;
