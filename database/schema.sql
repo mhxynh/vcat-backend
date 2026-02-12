@@ -17,11 +17,11 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE request_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED');
+    CREATE TYPE request_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE test_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED');
+    CREATE TYPE test_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- DAT/OET alignment with the Control Tracker Sheet
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
     user_id         BIGSERIAL PRIMARY KEY,
     email           VARCHAR(255) UNIQUE NOT NULL,
     role            user_role NOT NULL,
-    display_name    TEXT,
+    display_name    TEXT NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -50,21 +50,20 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS controls (
     control_id      BIGSERIAL PRIMARY KEY,
     vgcpid          VARCHAR(50) UNIQUE NOT NULL,
-    title           TEXT NOT NULL, 
     description     TEXT,
-    control_owner   TEXT,
-    control_sme     TEXT,
+    control_owner   TEXT NOT NULL,
+    control_sme     TEXT NOT NULL,
     escalation      BOOLEAN NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
-    data_created    DATE NOT NULL DEFAULT current_date,
+    date_created    DATE NOT NULL DEFAULT current_date,
     last_tested     DATE
 );
 
 CREATE TABLE IF NOT EXISTS requests (
     request_id      BIGSERIAL PRIMARY KEY,
-    requestor       TEXT,
+    requestor       TEXT NOT NULL,
     start_date      DATE,
-    due_date        DATE,
+    due_date        DATE NOT NULL,
     complete_date   DATE,
     status          request_status NOT NULL DEFAULT 'NOT_STARTED',
     created_by      BIGINT REFERENCES users(user_id), 
@@ -134,5 +133,3 @@ CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_versions_entity ON versions(entity_type, entity_id);
-
-COMMIT;
