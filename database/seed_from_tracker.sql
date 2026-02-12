@@ -1442,8 +1442,8 @@ ins_controls AS (
   SELECT
     s.vgcpid,
     s.notes,
-    s.control_owner,
-    s.control_sme,
+    COALESCE(s.control_owner, 'Unknown') AS control_owner,
+    COALESCE(s.control_sme, 'N/A') AS control_sme,
     s.escalation::boolean,
     s.date_completed::date
   FROM src s
@@ -1454,9 +1454,9 @@ ins_controls AS (
 ins_requests AS (
   INSERT INTO requests (requestor, start_date, due_date, complete_date, status, created_by)
   SELECT
-    s.control_owner,
+    COALESCE(s.control_owner, 'Unknown') AS requestor,
     s.date_started::date,
-    s.due_date::date,
+    COALESCE(s.due_date::date, current_date + interval '30 days') AS due_date,
     s.date_completed::date,
     s.request_status::request_status,
     (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id LIMIT 1)
