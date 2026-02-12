@@ -5,7 +5,6 @@ BEGIN;
 
 TRUNCATE TABLE
   audit_logs,
-  versions,
   comments,
   tests,
   requests,
@@ -1439,10 +1438,9 @@ Carly Snider', 'Spencer Stanley', FALSE, 'Sara', 'COMPLETED', 'Testing Completed
 ),
 -- Insert controls and keep deterministic ordering (by ref)
 ins_controls AS (
-  INSERT INTO controls (vgcpid, title, description, control_owner, control_sme, escalation, last_tested)
+  INSERT INTO controls (vgcpid, description, control_owner, control_sme, escalation, last_tested)
   SELECT
     s.vgcpid,
-    s.title,
     s.notes,
     s.control_owner,
     s.control_sme,
@@ -1490,14 +1488,14 @@ s AS (
 -- TESTS: two per row (DAT + OET)
 -- ----------------------------
 INSERT INTO tests (
-  request_id, control_id, test_track, assigned_tester_id,
+  request_id, control_id, test_type, assigned_tester_id,
   description, start_date, estimated_date, complete_date,
   in_progress_step, status
 )
 SELECT
   r.request_id,
   c.control_id,
-  t.track::test_track,
+  t.track::test_type,
   (SELECT user_id FROM users u
    WHERE lower(u.display_name) = lower(s.assigned_tester_name)
    LIMIT 1) AS assigned_tester_id,
@@ -1505,7 +1503,32 @@ SELECT
   s.date_started::date,
   s.eta::date,
   s.date_completed::date,
-  CASE WHEN t.track='DAT' THEN s.dat_step ELSE s.oet_step END AS in_progress_step,
+  CASE 
+    WHEN t.track='DAT' THEN 
+      CASE s.dat_step
+        WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
+        WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
+        WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+        WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
+        WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
+        WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
+        WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+        WHEN 'Walkthrough Completed' THEN 'COMPLETED'::test_progress_step
+        ELSE NULL
+      END
+    ELSE 
+      CASE s.oet_step
+        WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
+        WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
+        WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+        WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
+        WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
+        WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
+        WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+        WHEN 'Walkthrough Completed' THEN 'COMPLETED'::test_progress_step
+        ELSE NULL
+      END
+  END AS in_progress_step,
   CASE WHEN t.track='DAT' THEN s.dat_status::test_status ELSE s.oet_status::test_status END AS status
 FROM s
 JOIN c ON c.rn = s.rn
