@@ -37,6 +37,10 @@ DO $$ BEGIN
     CREATE TYPE auditable_entity AS ENUM ('CONTROL', 'REQUEST', 'TEST', 'COMMENT', 'USER'); 
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+    CREATE TYPE test_progress_step AS ENUM ('TESTING_READY', 'WALKTHROUGH_SCHEDULED', 'TESTING_IN_PROGRESS', 'TESTING_BLOCKED', 'TESTING_CANCELED', 'COMPLETED', 'ADDRESSING_COMMENTS');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 ---------- TABLES ----------
 CREATE TABLE IF NOT EXISTS users (
     user_id         BIGSERIAL PRIMARY KEY,
@@ -81,7 +85,7 @@ CREATE TABLE IF NOT EXISTS tests (
     start_date          DATE,
     estimated_date      DATE,
     complete_date       DATE,
-    in_progress_step    TEXT,
+    in_progress_step    test_progress_step,
     status              test_status NOT NULL DEFAULT 'NOT_STARTED',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
