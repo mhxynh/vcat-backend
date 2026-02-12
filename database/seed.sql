@@ -3,7 +3,7 @@
 -- Defaults (only applied if you don't pass -v VAR=...)
 \if :{?USERS} \else \set USERS 20 \endif
 \if :{?MANAGERS} \else \set MANAGERS 5 \endif
-\if :{?CONTROLS} \else \set CONTROLS 100 \endif
+\if :{?CONTROLS} \else \set CONTROLS 10 \endif
 \if :{?REQUESTS} \else \set REQUESTS :CONTROLS \endif
 \if :{?COMMENTS_PER_REQUEST} \else \set COMMENTS_PER_REQUEST 2 \endif
 \if :{?ESCALATION_EVERY} \else \set ESCALATION_EVERY 10 \endif
@@ -144,7 +144,7 @@ SELECT
   (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((t.test_id - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1),
   NULL::bigint,
   t.test_id,
-  format('Update on %s: %s', t.test_type, COALESCE(t.in_progress_step,'Not started'))
+  format('Update on %s: %s', t.test_type, COALESCE(t.in_progress_step::text, 'Not started'))
 FROM tests t
 WHERE t.test_id % 2 = 0
 LIMIT (SELECT GREATEST((:COMMENTS_PER_REQUEST - 1) * :REQUESTS, 0));
