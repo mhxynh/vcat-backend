@@ -79,4 +79,4 @@ jobs:
 
       - name: Show test summary
         if: always()
-        run: echo "✅ Database schema and seed tests completed"
+        run: echo "✅ Database schema, seed, and DML tests completed"
