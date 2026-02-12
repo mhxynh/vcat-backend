@@ -15,6 +15,21 @@ def _get_columns(db_conn, table_name):
         return {row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()}
 
 
+def _get_enum_values(db_conn, enum_name):
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT enumlabel
+            FROM pg_enum e
+            JOIN pg_type t ON t.oid = e.enumtypid
+            WHERE t.typname = %s
+            ORDER BY e.enumsortorder
+            """,
+            (enum_name,),
+        )
+        return [row[0] for row in cur.fetchall()]
+
+
 class TestSchema:
     """Test database schema structure and constraints"""
 
@@ -166,3 +181,52 @@ class TestSchema:
         
         expected_enums = {'user_role', 'request_status', 'test_status', 'test_type', 'audit_action', 'auditable_entity', 'test_progress_step'}
         assert expected_enums.issubset(enums), f"Missing enums: {expected_enums - enums}"
+
+    def test_enum_values(self, db_conn):
+        """Verify enum values are correct"""
+        expected = {
+            "user_role": ["MANAGER", "TESTER"],
+            "request_status": ["NOT_STARTED", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "BLOCKED", "ARCHIVED"],
+            "test_status": ["NOT_STARTED", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "BLOCKED", "ARCHIVED"],
+            "test_type": ["DAT", "OET"],
+            "audit_action": ["CREATE", "UPDATE", "DELETE", "ROLLBACK"],
+            "auditable_entity": ["CONTROL", "REQUEST", "TEST", "COMMENT", "USER"],
+            "test_progress_step": [
+                "TESTING_READY",
+                "WALKTHROUGH_SCHEDULED",
+                "TESTING_IN_PROGRESS",
+                "TESTING_BLOCKED",
+                "TESTING_CANCELED",
+                "COMPLETED",
+                "ADDRESSING_COMMENTS",
+            ],
+        }
+
+        for enum_name, values in expected.items():
+            assert _get_enum_values(db_conn, enum_name) == values
+
+    def test_indexes_exist(self, db_conn):
+        """Verify expected indexes exist"""
+        with db_conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT indexname
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                """
+            )
+            indexes = {row[0] for row in cur.fetchall()}
+
+        expected = {
+            "idx_tests_request",
+            "idx_tests_control",
+            "idx_tests_type",
+            "idx_tests_assigned",
+            "idx_comments_test",
+            "idx_comments_request",
+            "idx_audit_entity",
+            "idx_audit_actor",
+        }
+
+        missing = expected - indexes
+        assert not missing, f"Missing indexes: {missing}"
