@@ -1,4 +1,4 @@
-name: Test Database Schema and Seed
+name: Test Database Schema, Seed, and DML
 
 on:
   push:
@@ -63,6 +63,7 @@ jobs:
         run: |
           pytest tests/integration/test_schema.py -v
           pytest tests/integration/test_seed.py -v
+          pytest tests/integration/test_dml.py -v
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
 
