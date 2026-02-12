@@ -81,6 +81,24 @@ SET in_progress_step = %s, status = %s, updated_at = now()
 WHERE test_id = %s 
 RETURNING *;
 
+-- Update test status to IN_PROGRESS
+UPDATE tests
+SET testing_status = 'in_progress', start_date = current_date, updated_at = now()
+WHERE test_id = %s
+RETURNING *;
+
+-- Update test status to IN_REVIEW
+UPDATE tests
+SET testing_status = 'in_review', complete_date = current_date, updated_at = now()
+WHERE test_id = %s
+RETURNING *;
+
+-- Update test status to COMPLETED
+UPDATE tests
+SET testing_status = 'completed', complete_date = current_date, updated_at = now()
+WHERE test_id = %s
+RETURNING *;
+
 ---------- COMMENTS QUERIES ----------
 
 -- Get comments by test_id
@@ -109,6 +127,14 @@ ORDER BY changed_at DESC;
 -- Log audit action
 INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action, before_snapshot, after_snapshot, reason)
 VALUES (%s, %s, %s, %s, %s, %s, %s);
+
+-- Get all audit logs
+SELECT * FROM audit_logs ORDER BY changed_at DESC;
+
+-- Get audit logs for specific record (by entity type and id)
+SELECT * FROM audit_logs 
+WHERE entity_type = %s AND entity_id = %s 
+ORDER BY changed_at DESC;
 
 ---------- USERS QUERIES ----------
 
