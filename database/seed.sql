@@ -41,10 +41,9 @@ FROM generate_series(1, GREATEST(:USERS - :MANAGERS, 1)) AS s(i);
 -- ----------------------------
 -- CONTROLS
 -- ----------------------------
-INSERT INTO controls (vgcpid, title, description, control_owner, control_sme, escalation, last_tested)
+INSERT INTO controls (vgcpid, description, control_owner, control_sme, escalation, last_tested)
 SELECT
   format('VGCP-%05s', i) AS vgcpid,
-  format('Control Procedure %s', i) AS title,
   format('Description for control %s.', i) AS description,
   format('Owner %s', ((i - 1) % 8) + 1) AS control_owner,
   format('SME %s', ((i - 1) % 6) + 1) AS control_sme,
@@ -91,14 +90,14 @@ WITH
     JOIN c USING (rn)
   )
 INSERT INTO tests (
-  request_id, control_id, test_track, assigned_tester_id,
+  request_id, control_id, test_type, assigned_tester_id,
   description, start_date, estimated_date, complete_date,
   in_progress_step, status
 )
 SELECT
   p.request_id,
   p.control_id,
-  tt.track::test_track,
+  tt.track::test_type,
   (SELECT user_id
    FROM users
    WHERE role='TESTER'::user_role
@@ -145,7 +144,7 @@ SELECT
   (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((t.test_id - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1),
   NULL::bigint,
   t.test_id,
-  format('Update on %s: %s', t.test_track, COALESCE(t.in_progress_step,'Not started'))
+  format('Update on %s: %s', t.test_type, COALESCE(t.in_progress_step,'Not started'))
 FROM tests t
 WHERE t.test_id % 2 = 0
 LIMIT (SELECT GREATEST((:COMMENTS_PER_REQUEST - 1) * :REQUESTS, 0));
