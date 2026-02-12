@@ -17,74 +17,89 @@ def run_command(command):
     except subprocess.CalledProcessError as e:
         return False, e.stderr.strip()
 
-def check_aws_cli():
-    print("🔍 Checking for AWS CLI...")
-    success, version = run_command("aws --version")
+def check_tool(name, command, install_link):
+    print(f"🔍 Checking for {name}...")
+    success, version = run_command(command)
     if success:
-        print(f"✅ Found AWS CLI: {version}")
+        print(f"✅ Found {name}: {version.splitlines()[0]}")
         return True
     else:
-        print("❌ AWS CLI not found.")
-        print("   -> Please install it here: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
+        print(f"❌ {name} not found.")
+        print(f"   -> Please install it here: {install_link}")
+        return False
+
+def check_docker():
+    print("🔍 Checking for Docker...")
+    success, _ = run_command("docker ps")
+    if success:
+        print("✅ Docker is running.")
+        return True
+    else:
+        print("❌ Docker is NOT running or not installed.")
+        print("   -> Open Docker Desktop before running the backend.")
         return False
 
 def check_connection():
     print("\n☁️  Verifying AWS Connection...")
     success, output = run_command("aws sts get-caller-identity --output json")
-    
     if success:
         data = json.loads(output)
-        arn = data.get("Arn", "Unknown")
-        user = arn.split("/")[-1]
-        print(f"✅ SUCCESS! Connected as user: {user}")
-        print(f"   Account ID: {data.get('Account')}")
+        print(f"✅ SUCCESS! Connected as user: {data.get('Arn').split('/')[-1]}")
         return True
-    else:
-        print("⚠️  Connection Failed.")
-        return False
+    return False
 
-def configure_aws():
-    print("\n⚙️  Starting AWS Configuration Wizard...")
-    print("   (Have your Access Key ID and Secret Access Key ready from the CSV file)")
-    try:
-        # We use subprocess.call to let the user interact with the terminal directly
-        subprocess.call("aws configure", shell=True)
-        return True
-    except KeyboardInterrupt:
-        print("\n   Configuration cancelled.")
-        return False
+def setup_venv():
+    if not os.path.exists("venv"):
+        print("\n📦 Creating Virtual Environment (venv)...")
+        run_command("python -m venv venv")
+    
+    print("📦 Installing/Updating Python dependencies...")
+    pip_cmd = "venv\\Scripts\\pip" if os.name == "nt" else "venv/bin/pip"
+    run_command(f"{pip_cmd} install -r requirements.txt")
+    print("✅ Python dependencies installed in venv.")
 
 def main():
     print("========================================")
-    print("   V-CAT ENVIRONMENT SETUP")
+    print("   V-CAT FULL STACK ENVIRONMENT SETUP")
     print("========================================")
     
-    # Step 1: Check Tooling
-    if not check_aws_cli():
+    # 1. Check Fundamental Tools
+    tools = [
+        ("AWS CLI", "aws --version", "https://aws.amazon.com/cli/"),
+        ("AWS SAM CLI", "sam --version", "https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html"),
+        ("Node.js", "node --version", "https://nodejs.org/"),
+    ]
+    
+    all_tools_present = True
+    for name, cmd, link in tools:
+        if not check_tool(name, cmd, link):
+            all_tools_present = False
+
+    # 2. Check Docker (Mandatory for Backend)
+    if not check_docker():
+        all_tools_present = False
+
+    if not all_tools_present:
+        print("\n🛑 Setup incomplete. Please install missing tools and try again.")
         sys.exit(1)
 
-    # Step 2: Check if already connected
-    if check_connection():
-        print("\n🎉 You are all set! You don't need to do anything else.")
-        sys.exit(0)
+    # 3. Handle Python Venv & Dependencies
+    setup_venv()
 
-    # Step 3: Configure if needed
-    print("\n❌ No valid credentials found (or session expired).")
-    choice = input("   Do you want to configure AWS now? (y/n): ").lower()
+    # 4. Check AWS Session
+    if not check_connection():
+        print("\n❌ No valid AWS credentials found.")
+        choice = input("   Do you want to run 'aws configure' now? (y/n): ").lower()
+        if choice == 'y':
+            subprocess.call("aws configure", shell=True)
+            if not check_connection():
+                print("❌ Still unable to connect. Check your keys.")
     
-    if choice == 'y':
-        configure_aws()
-        # Verify again
-        if check_connection():
-            print("\n🚀 Setup Complete! You are ready to code.")
-        else:
-            print("\n❌ Something went wrong. Please check your keys and try again.")
-    else:
-        print("   Okay, run this script again when you are ready.")
-
-    print("\n📦 Installing Python dependencies...")
-    subprocess.call("pip install -r requirements.txt", shell=True)
-    print("✅ Dependencies installed.")
+    print("\n========================================")
+    print("🚀 SETUP COMPLETE! You are ready to develop.")
+    print("   - Backend: run 'sam build && sam local start-api'")
+    print("   - Frontend: run 'npm install' then 'npm start'")
+    print("========================================")
 
 if __name__ == "__main__":
     main()
