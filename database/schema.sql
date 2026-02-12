@@ -26,7 +26,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- DAT/OET alignment with the Control Tracker Sheet
 DO $$ BEGIN
-    CREATE TYPE test_track AS ENUM ('DAT', 'OET');
+    CREATE TYPE test_type AS ENUM ('DAT', 'OET');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS tests (
     test_id             BIGSERIAL PRIMARY KEY,
     request_id          BIGINT NOT NULL REFERENCES requests(request_id) ON DELETE CASCADE,
     control_id          BIGINT NOT NULL REFERENCES controls(control_id),
-    test_track          test_track NOT NULL,
+    test_type           test_type NOT NULL,
     assigned_tester_id  BIGINT REFERENCES users(user_id),
     description         TEXT,
     start_date          DATE,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS tests (
     status              test_status NOT NULL DEFAULT 'NOT_STARTED',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id, test_track)
+    CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id, test_type)
 );
 
 CREATE TABLE IF NOT EXISTS comments (
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ---------- INDEXES ----------
 CREATE INDEX IF NOT EXISTS idx_tests_request ON tests(request_id);
 CREATE INDEX IF NOT EXISTS idx_tests_control ON tests(control_id);
-CREATE INDEX IF NOT EXISTS idx_tests_track ON tests(test_track);
+CREATE INDEX IF NOT EXISTS idx_tests_type ON tests(test_type);
 CREATE INDEX IF NOT EXISTS idx_tests_assigned ON tests(assigned_tester_id);
 CREATE INDEX IF NOT EXISTS idx_comments_test ON comments(test_id);
 CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
