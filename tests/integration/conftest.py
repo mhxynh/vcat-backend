@@ -4,6 +4,7 @@ import pathlib
 import psycopg2
 import pytest
 import re
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -66,6 +67,19 @@ def _exec_sql_file(conn, path: pathlib.Path):
         cur.execute(sql)
     conn.commit()
 
+def _set_db_env_from_dsn(dsn: str) -> None:
+    parsed = urlparse(dsn)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        raise ValueError("Unsupported database URL scheme")
+
+    db_name = parsed.path.lstrip("/")
+    os.environ["DB_HOST"] = parsed.hostname or ""
+    os.environ["DB_PORT"] = str(parsed.port or 5432)
+    os.environ["DB_NAME"] = db_name
+    os.environ["DB_USER"] = parsed.username or ""
+    os.environ["DB_PASSWORD"] = parsed.password or ""
+    os.environ.pop("DB_PASSWORD_SECRET_NAME", None)
+
 @pytest.fixture(scope="session")
 def test_db_url():
     admin_dsn = _get_admin_dsn()
@@ -108,6 +122,27 @@ def test_db_url():
             cur.execute(f'DROP DATABASE IF EXISTS "{temp_db_name}"')
     finally:
         admin_conn.close()
+
+@pytest.fixture(scope="session", autouse=True)
+def _use_temp_db_env(test_db_url):
+    keys = [
+        "DB_HOST",
+        "DB_PORT",
+        "DB_NAME",
+        "DB_USER",
+        "DB_PASSWORD",
+        "DB_PASSWORD_SECRET_NAME",
+    ]
+    old_env = {key: os.environ.get(key) for key in keys}
+    _set_db_env_from_dsn(test_db_url)
+    try:
+        yield
+    finally:
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 @pytest.fixture
 def db_conn(test_db_url):
