@@ -43,7 +43,7 @@ FROM generate_series(1, GREATEST(:USERS - :MANAGERS, 1)) AS s(i);
 -- ----------------------------
 INSERT INTO controls (vgcpid, description, control_owner, control_sme, escalation, last_tested)
 SELECT
-  format('VGCP-%05s', i) AS vgcpid,
+  'VGCP-' || LPAD(CAST(FLOOR(RANDOM() * 100000) AS INT)::TEXT, 5, '0') AS vgcpid,
   format('Description for control %s.', i) AS description,
   format('Owner %s', ((i - 1) % 8) + 1) AS control_owner,
   format('SME %s', ((i - 1) % 6) + 1) AS control_sme,
