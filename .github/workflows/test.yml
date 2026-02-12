@@ -75,7 +75,6 @@ jobs:
           psql -h localhost -U postgres -d postgres -f database/seed_from_tracker.sql
         env:
           PGPASSWORD: postgres
-        continue-on-error: true  # Don't fail the build if this optional test fails
 
       - name: Show test summary
         if: always()
