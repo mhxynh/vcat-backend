@@ -35,4 +35,9 @@ jobs:
       # 6. Deploy to AWS
       # --no-confirm-changeset: Don't ask for "Yes/No", just do it.
       # --no-fail-on-empty-changeset: If nothing changed, don't crash.
-      - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+      - run: sam deploy
+          --no-confirm-changeset
+          --no-fail-on-empty-changeset
+          --parameter-overrides
+            dbHostParam="${{ secrets.DB_HOST }}"
+            dbPasswordParam="${{ secrets.DB_PASSWORD }}"
