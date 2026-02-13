@@ -1,9 +1,6 @@
 import os
 import pathlib
 
-from functions.common.db_utils import get_db_connection
-
-
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "database" / "schema.sql"
 #SEED_PATH = REPO_ROOT / "database" / "seed.sql"  # change to whatever seed file needed
@@ -27,12 +24,11 @@ def _verify(conn) -> None:
     with conn.cursor() as cur:
         # Basic verification queries required by the ticket
         cur.execute("SELECT COUNT(*) AS count FROM controls;")
-        count = cur.fetchone()["count"] if isinstance(cur.fetchone, dict) else None
 
     # RealDictCursor should give dict rows; to be safe, re-query cleanly:
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS count FROM controls;")
-        row = cur.fetchone()
+        row = cur.fetchone()['count']
         print(f"✅ controls row count: {row['count'] if isinstance(row, dict) else row[0]}")
 
         cur.execute("SELECT * FROM controls LIMIT 5;")

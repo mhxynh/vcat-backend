@@ -1,6 +1,5 @@
 import pytest
 
-
 class TestSeedData:
     """Test seed.sql generates expected data"""
 
@@ -40,22 +39,55 @@ class TestSeedData:
             request_count = cur.fetchone()[0]
         assert request_count > 0, "No requests created from seed"
 
-    def test_seed_creates_tests(self, db_conn):
-        """Verify seed creates tests (DAT and OET for each request/control)"""
+    def test_seed_creates_tests_with_tracks(self, db_conn):
+        """
+        Verify seed creates tests and assigns DAT/OET requirements correctly.
+        Checks that boolean flags are working and we have a mix of types.
+        """
         with db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM tests")
             test_count = cur.fetchone()[0]
             
-            cur.execute("""
-                SELECT test_type, COUNT(*) as count
-                FROM tests
-                GROUP BY test_type
-            """)
-            tracks = {row[0]: row[1] for row in cur.fetchall()}
-        
+            # Check for presence of DAT requirements
+            cur.execute("SELECT COUNT(*) FROM tests WHERE requires_dat = TRUE")
+            dat_count = cur.fetchone()[0]
+
+            # Check for presence of OET requirements
+            cur.execute("SELECT COUNT(*) FROM tests WHERE requires_oet = TRUE")
+            oet_count = cur.fetchone()[0]
+            
+            # Check for "Both" (Intersection)
+            cur.execute("SELECT COUNT(*) FROM tests WHERE requires_dat = TRUE AND requires_oet = TRUE")
+            both_count = cur.fetchone()[0]
+
         assert test_count > 0, "No tests created from seed"
-        assert "DAT" in tracks, "No DAT tests created"
-        assert "OET" in tracks, "No OET tests created"
+        assert dat_count > 0, "No tests with DAT requirements created"
+        assert oet_count > 0, "No tests with OET requirements created"
+        # Based on your seed logic (80% both), this should be true
+        assert both_count > 0, "No tests requiring BOTH tracks created"
+
+    def test_seed_test_steps_alignment(self, db_conn):
+        """
+        Verify that if a track is required, it has a valid step, 
+        and if not required, the step is NULL.
+        """
+        with db_conn.cursor() as cur:
+            # 1. Verify Integrity: requires_dat=TRUE implies dat_step is NOT NULL
+            cur.execute("""
+                SELECT COUNT(*) FROM tests 
+                WHERE requires_dat = TRUE AND dat_step IS NULL
+            """)
+            invalid_dat = cur.fetchone()[0]
+
+            # 2. Verify Cleanup: requires_dat=FALSE implies dat_step IS NULL
+            cur.execute("""
+                SELECT COUNT(*) FROM tests 
+                WHERE requires_dat = FALSE AND dat_step IS NOT NULL
+            """)
+            dirty_dat = cur.fetchone()[0]
+
+        assert invalid_dat == 0, "Found tests requiring DAT but having NULL dat_step"
+        assert dirty_dat == 0, "Found tests NOT requiring DAT but having a dat_step value"
 
     def test_seed_creates_comments(self, db_conn):
         """Verify seed creates comments on requests and tests"""
@@ -121,8 +153,7 @@ class TestSeedData:
                 FROM requests
             """)
             statuses = {row[0] for row in cur.fetchall()}
-            
-            valid_statuses = {'NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED'}
+            valid_statuses = {'NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'BLOCKED', 'ARCHIVED'}
             
         assert statuses.issubset(valid_statuses), f"Invalid request statuses: {statuses - valid_statuses}"
 
@@ -134,7 +165,6 @@ class TestSeedData:
                 FROM tests
             """)
             statuses = {row[0] for row in cur.fetchall()}
-            
-            valid_statuses = {'NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED'}
+            valid_statuses = {'NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED'}
             
         assert statuses.issubset(valid_statuses), f"Invalid test statuses: {statuses - valid_statuses}"

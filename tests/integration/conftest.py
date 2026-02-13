@@ -16,9 +16,9 @@ SEED_PATH = REPO_ROOT / "database" / "seed.sql"
 def _get_admin_dsn() -> str:
     """
     DSN to connect to Postgres *admin database* (e.g. "postgres"),
-    used only to create/drop a tep test database.
+    used only to create/drop a temp test database.
     
-    Set the TEST_DATABASE_URL in ev to something like:
+    Set the TEST_DATABASE_URL in env to something like:
     postgres://postgres:postgres@localhost:5432/postgres
 
     :return: DSN string for admin database connection
@@ -33,7 +33,7 @@ def _get_admin_dsn() -> str:
 
 def _with_db_name(dsn: str, dbname: str) -> str:
     # simple + safe for typical Postgres URLs.
-    # Assumes URL ends with /<dbname> o rhas dbname as last path segment.
+    # Assumes URL ends with /<dbname> or has dbname as last path segment.
     # Need to adjust if URL more complex
     if dsn.rstrip("/").endswith("/postgres"):
         return dsn.rstrip("/")[:-len("postgres")] + dbname

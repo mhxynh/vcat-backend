@@ -3,9 +3,9 @@
 -- Defaults (only applied if you don't pass -v VAR=...)
 \if :{?USERS} \else \set USERS 20 \endif
 \if :{?MANAGERS} \else \set MANAGERS 5 \endif
-\if :{?CONTROLS} \else \set CONTROLS 10 \endif
-\if :{?REQUESTS} \else \set REQUESTS :CONTROLS \endif
-\if :{?COMMENTS_PER_REQUEST} \else \set COMMENTS_PER_REQUEST 2 \endif
+\if :{?CONTROLS} \else \set CONTROLS 20 \endif
+\if :{?REQUESTS} \else \set REQUESTS 5 \endif
+\if :{?COMMENTS_PER_REQUEST} \else \set COMMENTS_PER_REQUEST 3 \endif
 \if :{?ESCALATION_EVERY} \else \set ESCALATION_EVERY 10 \endif
 
 BEGIN;
@@ -19,10 +19,7 @@ TRUNCATE TABLE
   users
 RESTART IDENTITY CASCADE;
 
--- ----------------------------
--- USERS
--- ----------------------------
--- Managers (default 5)
+-- 1. USERS: MANAGERS + TESTERS
 INSERT INTO users (email, role, display_name)
 SELECT
   format('manager%02s@vcat.local', i),
@@ -30,7 +27,6 @@ SELECT
   format('Manager %02s', i)
 FROM generate_series(1, :MANAGERS) AS s(i);
 
--- Testers (USERS - MANAGERS)
 INSERT INTO users (email, role, display_name)
 SELECT
   format('tester%02s@vcat.local', i),
@@ -38,9 +34,7 @@ SELECT
   format('Tester %02s', i)
 FROM generate_series(1, GREATEST(:USERS - :MANAGERS, 1)) AS s(i);
 
--- ----------------------------
--- CONTROLS
--- ----------------------------
+-- 2. CONTROLS
 INSERT INTO controls (vgcpid, description, control_owner, control_sme, escalation, last_tested)
 SELECT
   'VGCP-' || LPAD(CAST(FLOOR(RANDOM() * 100000) AS INT)::TEXT, 5, '0') AS vgcpid,
@@ -51,9 +45,7 @@ SELECT
   CASE WHEN i % 4 = 0 THEN (current_date - (i % 30)) ELSE NULL END AS last_tested
 FROM generate_series(1, :CONTROLS) AS s(i);
 
--- ----------------------------
--- REQUESTS (default = CONTROLS)
--- ----------------------------
+-- 3. REQUESTS
 INSERT INTO requests (requestor, start_date, due_date, complete_date, status, created_by)
 SELECT
   format('Requester %s', ((i - 1) % 10) + 1),
@@ -62,79 +54,77 @@ SELECT
   CASE WHEN i % 5 = 0 THEN current_date::date ELSE NULL END,
   CASE
     WHEN i % 5 = 0 THEN 'COMPLETED'::request_status
-    WHEN i % 3 = 0 THEN 'IN_REVIEW'::request_status
     WHEN i % 2 = 0 THEN 'IN_PROGRESS'::request_status
     ELSE 'NOT_STARTED'::request_status
   END,
-  (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id LIMIT 1)
+  (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % :MANAGERS) LIMIT 1)
 FROM generate_series(1, :REQUESTS) AS s(i);
 
--- ----------------------------
--- TESTS: DAT + OET per request/control pair
--- We map request N -> control N by row_number() (deterministic).
--- ----------------------------
-WITH
-  c AS (
-    SELECT control_id, vgcpid, row_number() OVER (ORDER BY control_id) AS rn
-    FROM controls
-  ),
-  r AS (
-    SELECT request_id, status, start_date, due_date, complete_date,
-           row_number() OVER (ORDER BY request_id) AS rn
-    FROM requests
-  ),
-  pairs AS (
-    SELECT r.request_id, r.status AS request_status, r.start_date, r.due_date, r.complete_date,
-           c.control_id, c.vgcpid
-    FROM r
-    JOIN c USING (rn)
-  )
+-- 4. TESTS
 INSERT INTO tests (
-  request_id, control_id, test_type, assigned_tester_id,
-  description, start_date, estimated_date, complete_date,
-  in_progress_step, status
+  request_id, 
+  control_id, 
+  assigned_tester_id,
+  description, 
+  requires_dat,
+  requires_oet,
+  dat_step,
+  oet_step,
+  status,
+  start_date, 
+  estimated_date, 
+  complete_date
 )
 SELECT
-  p.request_id,
-  p.control_id,
-  tt.track::test_type,
-  (SELECT user_id
-   FROM users
-   WHERE role='TESTER'::user_role
-   ORDER BY user_id
-   OFFSET ((p.control_id - 1) % GREATEST(:USERS - :MANAGERS, 1))
-   LIMIT 1),
-  format('%s testing for %s', tt.track, p.vgcpid),
-  CASE WHEN p.request_status IN ('IN_PROGRESS','IN_REVIEW','COMPLETED') THEN p.start_date ELSE NULL END,
-  (p.due_date - 2),
-  CASE WHEN p.request_status = 'COMPLETED' THEN p.complete_date ELSE NULL END,
-  CASE
-    WHEN p.request_status = 'NOT_STARTED' THEN NULL
-    WHEN p.request_status = 'IN_PROGRESS' THEN 'TESTING_IN_PROGRESS'::test_progress_step
-    WHEN p.request_status = 'IN_REVIEW' THEN 'ADDRESSING_COMMENTS'::test_progress_step
-    WHEN p.request_status = 'COMPLETED' THEN 'COMPLETED'::test_progress_step
-    ELSE 'TESTING_BLOCKED'::test_progress_step
-  END,
-  CASE
-    WHEN p.request_status = 'NOT_STARTED' THEN 'NOT_STARTED'::test_status
-    WHEN p.request_status = 'IN_PROGRESS' THEN 'IN_PROGRESS'::test_status
-    WHEN p.request_status = 'IN_REVIEW' THEN 'IN_REVIEW'::test_status
-    WHEN p.request_status = 'COMPLETED' THEN 'COMPLETED'::test_status
-    ELSE 'BLOCKED'::test_status
-  END
-FROM pairs p
-CROSS JOIN (VALUES ('DAT'), ('OET')) AS tt(track);
+  -- Map Control N to a Request
+  ((s.i - 1) % :REQUESTS) + 1 AS request_id,
+  
+  s.i AS control_id,
+  
+  -- Assign Tester
+  (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1),
+  
+  format('Testing for Control %s', s.i),
+  
+  -- REQUIREMENTS LOGIC:
+  -- 80% have BOTH (Mod 10 NOT IN (0, 1))
+  -- 10% have DAT Only (Mod 10 = 0)
+  -- 10% have OET Only (Mod 10 = 1)
+  CASE WHEN (s.i % 10) != 1 THEN TRUE ELSE FALSE END AS requires_dat,
+  CASE WHEN (s.i % 10) != 0 THEN TRUE ELSE FALSE END AS requires_oet,
 
--- ----------------------------
--- COMMENTS (lightweight + adjustable)
--- ----------------------------
+  -- STEP GENERATION LOGIC (Must match requirements exactly):
+  -- If DAT is required (same logic as above), generate a random step.
+  CASE 
+     WHEN (s.i % 10) != 1 THEN 
+        (ARRAY['TESTING_READY', 'WALKTHROUGH_SCHEDULED', 'TESTING_IN_PROGRESS', 'COMPLETED', 'ADDRESSING_COMMENTS']::test_progress_step[])[FLOOR(RANDOM() * 5 + 1)]
+     ELSE NULL 
+  END AS dat_step,
+  
+  -- If OET is required (same logic as above), generate a random step.
+  CASE 
+     WHEN (s.i % 10) != 0 THEN 
+        (ARRAY['TESTING_READY', 'TESTING_IN_PROGRESS', 'COMPLETED', 'ADDRESSING_COMMENTS']::test_progress_step[])[FLOOR(RANDOM() * 4 + 1)]
+     ELSE NULL 
+  END AS oet_step,
+
+  -- Overall Test Status
+  (ARRAY['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED']::test_status[])[FLOOR(RANDOM() * 4 + 1)] AS status,
+
+  -- Dates
+  current_date - 5,
+  current_date + 5,
+  NULL
+FROM generate_series(1, :CONTROLS) AS s(i);
+
+-- 5. COMMENTS
 -- 1 request-level comment per request
 INSERT INTO comments (author_user_id, request_id, test_id, comment_text)
 SELECT
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id OFFSET ((r.request_id - 1) % :MANAGERS) LIMIT 1),
   r.request_id,
   NULL::bigint,
-  format('Request %s created (%s).', r.request_id, r.status)
+  format('Request %s created.  Status: %s', r.request_id, r.status)
 FROM requests r;
 
 -- (COMMENTS_PER_REQUEST - 1) test-level comments per request (spread across tests)
@@ -144,7 +134,7 @@ SELECT
   (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((t.test_id - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1),
   NULL::bigint,
   t.test_id,
-  format('Update on %s: %s', t.test_type, COALESCE(t.in_progress_step::text, 'Not started'))
+  format('Work log for Test %s. DAT Step: %s, OET Step: %s', t.test_id, COALESCE(t.dat_step::text, 'N/A'), COALESCE(t.oet_step::text, 'N/A'))
 FROM tests t
 WHERE t.test_id % 2 = 0
 LIMIT (SELECT GREATEST((:COMMENTS_PER_REQUEST - 1) * :REQUESTS, 0));
