@@ -3,7 +3,7 @@ name: Deploy Backend to AWS
 on:
   push:
     branches:
-      - main  # Only runs when code is pushed to main
+      - main # Only runs when code is pushed to main
 
 jobs:
   deploy-lambda:
@@ -15,7 +15,7 @@ jobs:
       # 2. Set up Python (Matches your SAM runtime)
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       # 3. Set up AWS SAM CLI tool
       - uses: aws-actions/setup-sam@v2
@@ -35,4 +35,9 @@ jobs:
       # 6. Deploy to AWS
       # --no-confirm-changeset: Don't ask for "Yes/No", just do it.
       # --no-fail-on-empty-changeset: If nothing changed, don't crash.
-      - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+      - run: sam deploy
+          --no-confirm-changeset
+          --no-fail-on-empty-changeset
+          --parameter-overrides
+          dbHostParam="${{ secrets.DB_HOST }}"
+          dbPasswordParam="${{ secrets.DB_PASSWORD }}"

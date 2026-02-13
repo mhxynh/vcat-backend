@@ -9,6 +9,7 @@ Description: >
 Globals:
   Function:
     Timeout: 3
+    CodeUri: src/
 
     # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
     LoggingConfig:
@@ -17,28 +18,41 @@ Resources:
   ControlsFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: functions/controls/
-      Handler: app.lambda_handler
+      Handler: functions.controls.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Events:
-        ControlsApi:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+        GetControls:
+          Type: Api
           Properties:
             Path: /controls
             Method: get
+        GetControlById:
+          Type: Api
+          Properties:
+            Path: /controls/{vgcpid}
+            Method: get
+        CreateControl:
+          Type: Api
+          Properties:
+            Path: /controls
+            Method: post
+        UpdateControl:
+          Type: Api
+          Properties:
+            Path: /controls/{vgcpid}
+            Method: put
 
   CatalogFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/catalog/
-      Handler: app.lambda_handler
+      Handler: functions.catalog.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Events:
-        CatalogApi:
+        GetCatalog:
           Type: Api
           Properties:
             Path: /catalog
@@ -47,13 +61,12 @@ Resources:
   RequestsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/requests/
-      Handler: app.lambda_handler
+      Handler: functions.requests.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Events:
-        RequestsApi:
+        GetRequests:
           Type: Api
           Properties:
             Path: /requests
@@ -62,13 +75,12 @@ Resources:
   CommentsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/comments/
-      Handler: app.lambda_handler
+      Handler: functions.comments.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Events:
-        CommentsApi:
+        GetComments:
           Type: Api
           Properties:
             Path: /comments
@@ -77,13 +89,12 @@ Resources:
   AuditFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/audit/
-      Handler: app.lambda_handler
+      Handler: functions.audit.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Events:
-        AuditApi:
+        GetAudit:
           Type: Api
           Properties:
             Path: /audit
@@ -92,8 +103,7 @@ Resources:
   ExportFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/exporting/
-      Handler: app.lambda_handler
+      Handler: functions.exporting.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
@@ -107,13 +117,12 @@ Resources:
   NotificationsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/notifications/
-      Handler: app.lambda_handler
+      Handler: functions.notifications.main.lambda_handler
       Runtime: python3.12
       Architectures:
         - x86_64
       Events:
-        NotificationsApi:
+        GetNotifications:
           Type: Api
           Properties:
             Path: /notifications
