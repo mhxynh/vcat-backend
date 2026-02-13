@@ -3,17 +3,26 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   vcat-backend
 
-  Sample SAM Template for vcat-backend
-
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
     Timeout: 3
     CodeUri: src/
-
+    Environment:
+      Variables:
+        DB_HOST: !Ref dbHostParam
+        DB_PASSWORD: !Ref dbPasswordParam
     # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
     LoggingConfig:
       LogFormat: JSON
+
+Parameters:
+  dbHostParam:
+    Type: String
+  dbPasswordParam:
+    Type: String
+    NoEcho: true
+
 Resources:
   ControlsFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -141,6 +150,7 @@ Resources:
       ResourceGroupName:
         Ref: ApplicationResourceGroup
       AutoConfigurationEnabled: "true"
+
 # Outputs:
 #   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
 #   # Find out more about other implicit resources you can reference within SAM

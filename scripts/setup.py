@@ -4,7 +4,6 @@ import os
 import json
 
 def run_command(command):
-    """Runs a shell command and returns the output."""
     try:
         result = subprocess.run(
             command, 
@@ -19,7 +18,6 @@ def run_command(command):
         return False, e.stderr.strip()
 
 def check_aws_cli():
-    """Checks if AWS CLI is installed."""
     print("🔍 Checking for AWS CLI...")
     success, version = run_command("aws --version")
     if success:
@@ -31,7 +29,6 @@ def check_aws_cli():
         return False
 
 def check_connection():
-    """Tries to connect to AWS to verify credentials."""
     print("\n☁️  Verifying AWS Connection...")
     success, output = run_command("aws sts get-caller-identity --output json")
     
@@ -47,7 +44,6 @@ def check_connection():
         return False
 
 def configure_aws():
-    """Runs the configuration wizard."""
     print("\n⚙️  Starting AWS Configuration Wizard...")
     print("   (Have your Access Key ID and Secret Access Key ready from the CSV file)")
     try:
@@ -85,6 +81,10 @@ def main():
             print("\n❌ Something went wrong. Please check your keys and try again.")
     else:
         print("   Okay, run this script again when you are ready.")
+
+    print("\n📦 Installing Python dependencies...")
+    subprocess.call("pip install -r requirements.txt", shell=True)
+    print("✅ Dependencies installed.")
 
 if __name__ == "__main__":
     main()
