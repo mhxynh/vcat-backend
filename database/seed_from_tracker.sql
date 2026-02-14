@@ -1485,76 +1485,77 @@ s AS (
   FROM src
 )
 -- ----------------------------
--- TESTS: two per row (DAT + OET)
+-- TESTS: one per request/control pair with DAT and OET tracking
 -- ----------------------------
 INSERT INTO tests (
-  request_id, control_id, test_type, assigned_tester_id,
-  description, start_date, estimated_date, complete_date,
-  in_progress_step, status
+  request_id, control_id, requires_dat, requires_oet, 
+  dat_step, oet_step, assigned_tester_id,
+  description, start_date, estimated_date, complete_date, status
 )
 SELECT
   r.request_id,
   c.control_id,
-  t.track::test_type,
+  TRUE,  -- requires_dat
+  TRUE,  -- requires_oet
+  CASE s.dat_step
+    WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
+    WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
+    WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+    WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
+    WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
+    WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
+    WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+    WHEN 'Walkthrough Completed' THEN 'WALKTHROUGH_COMPLETED'::test_progress_step
+    ELSE NULL
+  END AS dat_step,
+  CASE s.oet_step
+    WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
+    WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
+    WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+    WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
+    WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
+    WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
+    WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+    WHEN 'Walkthrough Completed' THEN 'WALKTHROUGH_COMPLETED'::test_progress_step
+    ELSE NULL
+  END AS oet_step,
   (SELECT user_id FROM users u
    WHERE lower(u.display_name) = lower(s.assigned_tester_name)
    LIMIT 1) AS assigned_tester_id,
-  format('%s test for %s', t.track, s.vgcpid) AS description,
+  s.title AS description,
   s.date_started::date,
   s.eta::date,
   s.date_completed::date,
   CASE 
-    WHEN t.track='DAT' THEN 
-      CASE s.dat_step
-        WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
-        WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
-        WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
-        WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
-        WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
-        WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
-        WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
-        WHEN 'Walkthrough Completed' THEN 'COMPLETED'::test_progress_step
-        ELSE NULL
-      END
-    ELSE 
-      CASE s.oet_step
-        WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
-        WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
-        WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
-        WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
-        WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
-        WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
-        WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
-        WHEN 'Walkthrough Completed' THEN 'COMPLETED'::test_progress_step
-        ELSE NULL
-      END
-  END AS in_progress_step,
-  CASE WHEN t.track='DAT' THEN s.dat_status::test_status ELSE s.oet_status::test_status END AS status
+    WHEN s.dat_status::text = 'COMPLETED' AND s.oet_status::text = 'COMPLETED' THEN 'COMPLETED'::test_status
+    ELSE (CASE WHEN s.dat_status::text IN ('BLOCKED', 'ARCHIVED') OR s.oet_status::text IN ('BLOCKED', 'ARCHIVED') 
+          THEN 'BLOCKED'::test_status ELSE 'IN_PROGRESS'::test_status END)
+  END AS status
 FROM s
 JOIN c ON c.rn = s.rn
-JOIN r ON r.rn = s.rn
-CROSS JOIN (VALUES ('DAT'), ('OET')) AS t(track);
+JOIN r ON r.rn = s.rn;
 
 -- ----------------------------
 -- COMMENTS: one request-level comment per row (tracker notes)
 -- ----------------------------
-WITH 
-c AS (
-  SELECT control_id, description, row_number() OVER (ORDER BY control_id) AS rn
-  FROM controls
+WITH
+src_for_comments AS (
+  SELECT
+    row_number() OVER (ORDER BY ref) AS rn,
+    notes
+  FROM src
 ),
-r AS (
+req_for_comments AS (
   SELECT request_id, row_number() OVER (ORDER BY request_id) AS rn
   FROM requests
 )
-INSERT INTO comments (author_user_id, request_id, test_id, comment_text)
+INSERT INTO comments (author_user_id, request_id, comment_text)
 SELECT
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id LIMIT 1),
   r.request_id,
-  NULL::bigint,
-  COALESCE(c.description, '')::text
-FROM c
-JOIN r ON r.rn = c.rn
-WHERE c.description IS NOT NULL AND length(c.description) > 0;
+  COALESCE(s.notes, '')::text
+FROM src_for_comments s
+JOIN req_for_comments r ON r.rn = s.rn
+WHERE s.notes IS NOT NULL AND length(s.notes) > 0;
 
 COMMIT;
