@@ -39,12 +39,12 @@ class TestSeedData:
             request_count = cur.fetchone()[0]
         assert request_count > 0, "No requests created from seed"
 
-    def test_seed_creates_tests_with_tracks(self, db_conn):
+    def test_seed_creates_tests_with_tracks(self, seed_db_conn):
         """
         Verify seed creates tests and assigns DAT/OET requirements correctly.
         Checks that boolean flags are working and we have a mix of types.
         """
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM tests")
             test_count = cur.fetchone()[0]
             
@@ -66,12 +66,12 @@ class TestSeedData:
         # Based on your seed logic (80% both), this should be true
         assert both_count > 0, "No tests requiring BOTH tracks created"
 
-    def test_seed_test_steps_alignment(self, db_conn):
+    def test_seed_test_steps_alignment(self, seed_db_conn):
         """
         Verify that if a track is required, it has a valid step, 
         and if not required, the step is NULL.
         """
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             # 1. Verify Integrity: requires_dat=TRUE implies dat_step is NOT NULL
             cur.execute("""
                 SELECT COUNT(*) FROM tests 

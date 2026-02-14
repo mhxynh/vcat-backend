@@ -25,10 +25,10 @@ def _get_admin_conn_params(dsn: str) -> dict:
     }
 
 def _run_psql_file(db_url: str, file_path: pathlib.Path, vars: dict = None):
-    """
+    '''
     Executes a SQL file using the psql CLI tool via subprocess.
-    This is REQUIRED to support \if, \set, and other psql meta-commands.
-    """
+    This is REQUIRED to support "if", "set", and other psql meta-commands.
+    '''
     # -v ON_ERROR_STOP=1 ensures the test fails if the SQL fails
     cmd = ["psql", db_url, "-v", "ON_ERROR_STOP=1", "-f", str(file_path)]
     
@@ -162,46 +162,43 @@ def seed_db_url():
     Separate fixture for seed tests - creates its own isolated database
     so it's not affected by other tests deleting data
     """
-    admin_dsn = _get_admin_dsn()
+    base_dsn = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+    admin_params = _get_admin_conn_params(base_dsn)
     temp_db_name = f"vcat_test_seed_{uuid.uuid4().hex[:12]}"
-    temp_dsn = _with_db_name(admin_dsn, temp_db_name)
-
-    # connect to admin db and create temp db
-    admin_conn = psycopg2.connect(admin_dsn)
+    
+    # Create admin connection
+    admin_conn = psycopg2.connect(**admin_params)
     admin_conn.autocommit = True
     try:
         with admin_conn.cursor() as cur:
             cur.execute(f'CREATE DATABASE "{temp_db_name}"')
     finally:
         admin_conn.close()
-
-    # apply schema + seed
-    conn = psycopg2.connect(temp_dsn)
+    
+    # Construct temp DSN
+    parsed = urlparse(base_dsn)
+    temp_dsn = f"postgresql://{parsed.username}:{parsed.password}@{parsed.hostname}:{parsed.port}/{temp_db_name}"
+    
+    # Apply schema + seed
     try:
-        _exec_sql_file(conn, SCHEMA_PATH)
-        _exec_sql_file(conn, SEED_PATH)
-    finally:
-        conn.close()
+        _run_psql_file(temp_dsn, SCHEMA_PATH)
+        _run_psql_file(temp_dsn, SEED_PATH)
         
-    yield temp_dsn
-
-    # cleanup: drop temp db
-    admin_conn = psycopg2.connect(admin_dsn)
-    admin_conn.autocommit = True
-    try:
-        with admin_conn.cursor() as cur:
-            # terminate any connection just in case
-            cur.execute(
-                """
-                SELECT pg_terminate_backend(pid)
-                FROM pg_stat_activity
-                WHERE datname = %s AND pid <> pg_backend_pid() 
-                """,
-                (temp_db_name,),
-            )
-            cur.execute(f'DROP DATABASE IF EXISTS "{temp_db_name}"')
+        yield temp_dsn
     finally:
-        admin_conn.close()
+        # Cleanup: drop temp db
+        admin_conn = psycopg2.connect(**admin_params)
+        admin_conn.autocommit = True
+        try:
+            with admin_conn.cursor() as cur:
+                cur.execute(f"""
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE datname = '{temp_db_name}' AND pid <> pg_backend_pid()
+                """)
+                cur.execute(f'DROP DATABASE IF EXISTS "{temp_db_name}"')
+        finally:
+            admin_conn.close()
 
 @pytest.fixture
 def seed_db_conn(seed_db_url):
