@@ -1,14 +1,3 @@
--- This is a SQL schema file for a PostgreSQL database.
--- It follows:
-    -- the schema-vcats.sql file,
-    -- the Controls Tracker spreadsheet (DAT vs OET tracks),
-    -- the OpenAPI endpoints: GET /summary, GET /requests, GET /tests
-
--- Run:
-    --   createdb vcatdb
-    --   psql -d vcatdb -f db/schema.sql
---
-
 BEGIN;
 
 ---------- ENUMS ----------
@@ -17,16 +6,24 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE request_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
+    CREATE TYPE request_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
     CREATE TYPE test_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- DAT/OET alignment with the Control Tracker Sheet
 DO $$ BEGIN
-    CREATE TYPE test_type AS ENUM ('DAT', 'OET');
+    CREATE TYPE test_progress_step AS ENUM (
+        'TESTING_READY',
+        'WALKTHROUGH_SCHEDULED',
+        'WALKTHROUGH_COMPLETED',
+        'TESTING_IN_PROGRESS',
+        'TESTING_BLOCKED',
+        'TESTING_CANCELED',
+        'COMPLETED',
+        'ADDRESSING_COMMENTS'
+    );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -37,9 +34,14 @@ DO $$ BEGIN
     CREATE TYPE auditable_entity AS ENUM ('CONTROL', 'REQUEST', 'TEST', 'COMMENT', 'USER'); 
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-DO $$ BEGIN
-    CREATE TYPE test_progress_step AS ENUM ('TESTING_READY', 'WALKTHROUGH_SCHEDULED', 'TESTING_IN_PROGRESS', 'TESTING_BLOCKED', 'TESTING_CANCELED', 'COMPLETED', 'ADDRESSING_COMMENTS');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+---------- FUNCTIONS ----------
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = now();
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
 
 ---------- TABLES ----------
 CREATE TABLE IF NOT EXISTS users (
@@ -56,7 +58,7 @@ CREATE TABLE IF NOT EXISTS controls (
     vgcpid          VARCHAR(50) UNIQUE NOT NULL,
     description     TEXT,
     control_owner   TEXT NOT NULL,
-    control_sme     TEXT NOT NULL,
+    control_sme     TEXT,
     escalation      BOOLEAN NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     date_created    DATE NOT NULL DEFAULT current_date,
@@ -70,26 +72,28 @@ CREATE TABLE IF NOT EXISTS requests (
     due_date        DATE NOT NULL,
     complete_date   DATE,
     status          request_status NOT NULL DEFAULT 'NOT_STARTED',
-    created_by      BIGINT REFERENCES users(user_id), 
+    created_by      BIGINT REFERENCES users(user_id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Tests are per (request, control, track)
 CREATE TABLE IF NOT EXISTS tests (
     test_id             BIGSERIAL PRIMARY KEY,
     request_id          BIGINT NOT NULL REFERENCES requests(request_id) ON DELETE CASCADE,
     control_id          BIGINT NOT NULL REFERENCES controls(control_id),
-    test_type           test_type NOT NULL,
+    requires_dat        BOOLEAN NOT NULL DEFAULT TRUE,
+    requires_oet        BOOLEAN NOT NULL DEFAULT TRUE,
+    dat_step            test_progress_step,
+    oet_step            test_progress_step,
     assigned_tester_id  BIGINT REFERENCES users(user_id),
     description         TEXT,
     start_date          DATE,
     estimated_date      DATE,
     complete_date       DATE,
-    in_progress_step    test_progress_step,
     status              test_status NOT NULL DEFAULT 'NOT_STARTED',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id, test_type)
+    CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id),
+    CONSTRAINT test_must_have_track CHECK (requires_dat OR requires_oet)
 );
 
 CREATE TABLE IF NOT EXISTS comments (
@@ -100,7 +104,9 @@ CREATE TABLE IF NOT EXISTS comments (
     comment_text        TEXT NOT NULL,
     posted_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT  comments_target_chk CHECK (
-        test_id IS NOT NULL OR request_id IS NOT NULL
+        (test_id IS NOT NULL AND request_id IS NULL)
+        OR
+        (test_id IS NULL AND request_id IS NOT NULL)
     )
 );
 
@@ -116,10 +122,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     reason          TEXT
 );
 
+---------- TRIGGERS ----------
+CREATE TRIGGER update_tests_modtime BEFORE UPDATE ON tests FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
 ---------- INDEXES ----------
 CREATE INDEX IF NOT EXISTS idx_tests_request ON tests(request_id);
 CREATE INDEX IF NOT EXISTS idx_tests_control ON tests(control_id);
-CREATE INDEX IF NOT EXISTS idx_tests_type ON tests(test_type);
+CREATE INDEX IF NOT EXISTS idx_tests_dat_step ON tests(dat_step);
+CREATE INDEX IF NOT EXISTS idx_tests_oet_step ON tests(oet_step);
 CREATE INDEX IF NOT EXISTS idx_tests_assigned ON tests(assigned_tester_id);
 CREATE INDEX IF NOT EXISTS idx_comments_test ON comments(test_id);
 CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);

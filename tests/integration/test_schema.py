@@ -40,7 +40,7 @@ class TestSchema:
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-            """        )
+            """)
             tables = {row[0] for row in cur.fetchall()}
         expected_tables = {"audit_logs", "comments", "controls", "users", "tests", "requests"}
         assert expected_tables.issubset(tables), f"Expected tables {expected_tables} not all found in database. Found tables: {tables}"
@@ -53,6 +53,8 @@ class TestSchema:
         assert "email" in columns
         assert "role" in columns
         assert "display_name" in columns
+        assert "is_active" in columns
+        
         assert columns["email"][0] == "character varying"
         assert columns["email"][1] == "NO"  # NOT NULL
         assert columns["user_id"][1] == "NO"  # PRIMARY KEY is NOT NULL
@@ -111,6 +113,36 @@ class TestSchema:
         assert "posted_at" in columns
         assert columns["author_user_id"][1] == "NO"
         assert columns["comment_text"][1] == "NO"
+        assert columns["email"][1] == "NO"
+        assert columns["user_id"][1] == "NO"
+        assert columns["is_active"][1] == "NO"
+
+    def test_tests_table_structure(self, db_conn):
+        """
+        New Test: Verify tests table has the new DAT/OET track columns
+        """
+        with db_conn.cursor() as cur:
+            cur.execute("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = 'tests'
+            """)
+            columns = {row[0]: row[1] for row in cur.fetchall()}
+
+        # Verify the boolean flags exist
+        assert "requires_dat" in columns
+        assert "requires_oet" in columns
+        assert columns["requires_dat"] == "boolean"
+        assert columns["requires_oet"] == "boolean"
+        # Verify the separate steps exist
+        assert "dat_step" in columns
+        assert "oet_step" in columns
+        # Note: Postgres returns 'USER-DEFINED' for enums in information_schema
+        assert columns["dat_step"] == "USER-DEFINED" 
+        assert columns["oet_step"] == "USER-DEFINED"
+
+        # Verify the macro status exists
+        assert "status" in columns
 
     def test_primary_keys_exist(self, db_conn):
         """Verify all tables have primary keys"""
@@ -167,6 +199,18 @@ class TestSchema:
 
         missing = expected - fks
         assert not missing, f"Missing foreign keys: {missing}"
+            cur.execute("""
+                SELECT constraint_name, table_name
+                FROM information_schema.table_constraints
+                WHERE constraint_type = 'FOREIGN KEY'
+                AND table_schema = 'public'
+            """)
+            fks = {row[0]: row[1] for row in cur.fetchall()}
+        
+        # Verify some key foreign keys exist
+        assert any('tests' in table for table in fks.values()), "Missing foreign keys in tests table"
+        assert any('comments' in table for table in fks.values()), "Missing foreign keys in comments table"
+        assert any('requests' in table for table in fks.values()), "Missing foreign keys in requests table"
 
     def test_enums_exist(self, db_conn):
         """Verify required ENUM types are defined"""
@@ -175,11 +219,12 @@ class TestSchema:
                 SELECT typname
                 FROM pg_type
                 WHERE typtype = 'e'
-                AND typname IN ('user_role', 'request_status', 'test_status', 'test_type', 'audit_action', 'auditable_entity', 'test_progress_step')
+                -- Removed 'test_type' from query as it was deleted
+                AND typname IN ('user_role', 'request_status', 'test_status', 'audit_action', 'auditable_entity', 'test_progress_step')
             """)
             enums = {row[0] for row in cur.fetchall()}
         
-        expected_enums = {'user_role', 'request_status', 'test_status', 'test_type', 'audit_action', 'auditable_entity', 'test_progress_step'}
+        expected_enums = {'user_role', 'request_status', 'test_status', 'audit_action', 'auditable_entity', 'test_progress_step'}
         assert expected_enums.issubset(enums), f"Missing enums: {expected_enums - enums}"
 
     def test_enum_values(self, db_conn):
