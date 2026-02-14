@@ -137,11 +137,6 @@ RETURNING *;
 -- Get all audit logs
 SELECT * FROM audit_logs ORDER BY changed_at DESC;
 
--- Get audit logs for specific record (by entity type and id)
-SELECT * FROM audit_logs 
-WHERE entity_type = %s AND entity_id = %s 
-ORDER BY changed_at DESC;
-
 ---------- USERS QUERIES ----------
 
 -- Get user by user_id
