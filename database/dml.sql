@@ -131,7 +131,8 @@ ORDER BY changed_at DESC;
 
 -- Log audit action
 INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action, before_snapshot, after_snapshot, reason)
-VALUES (%s, %s, %s, %s, %s, %s, %s);
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+RETURNING *;
 
 -- Get all audit logs
 SELECT * FROM audit_logs ORDER BY changed_at DESC;
