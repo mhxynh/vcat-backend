@@ -41,7 +41,9 @@ class TestControlsDML:
         assert result['vgcpid'] == 'VGCP-001'
         assert result['description'] == 'Test Control'
         assert result['control_owner'] == 'John Doe'
-        
+        assert result['control_sme'] == 'Jane Smith'
+        assert result['escalation'] == False
+        assert result['is_active'] == True
         cursor.close()
 
     def test_get_control_by_vgcpid(self, db_conn):
@@ -127,6 +129,33 @@ class TestControlsDML:
         db_conn.commit()
         
         assert result['is_active'] == False
+        
+        cursor.close()
+
+    def test_delete_control(self, db_conn):
+        """Test DELETE - Delete a control by vgcpid"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create a control
+        insert_sql = """INSERT INTO controls (vgcpid, description, control_owner, control_sme)
+                        VALUES (%s, %s, %s, %s)"""
+        cursor.execute(insert_sql, ('VGCP-DELETE', 'To Delete', 'Owner', 'SME'))
+        db_conn.commit()
+        
+        # Delete it
+        delete_sql = "DELETE FROM controls WHERE vgcpid = %s RETURNING *"
+        cursor.execute(delete_sql, ('VGCP-DELETE',))
+        result = cursor.fetchone()
+        db_conn.commit()
+        
+        assert result is not None
+        assert result['vgcpid'] == 'VGCP-DELETE'
+        
+        # Verify it's gone
+        verify_sql = "SELECT * FROM controls WHERE vgcpid = %s"
+        cursor.execute(verify_sql, ('VGCP-DELETE',))
+        verify_result = cursor.fetchone()
+        assert verify_result is None
         
         cursor.close()
 
@@ -224,6 +253,32 @@ class TestRequestsDML:
         
         cursor.close()
 
+    def test_get_request_by_id(self, db_conn):
+        """Test SELECT - Get request by request_id"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create a user first for created_by
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'Test User'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
+        # Create a request
+        insert_sql = "INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id"
+        cursor.execute(insert_sql, ('Get Request', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        request_id = cursor.fetchone()['request_id']
+        db_conn.commit()
+        
+        # Retrieve it
+        select_sql = "SELECT * FROM requests WHERE request_id = %s"
+        cursor.execute(select_sql, (request_id,))
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result['requestor'] == 'Get Request'
+        assert result['request_id'] == request_id
+        
+        cursor.close()
+
 
 class TestTestsDML:
     """Test DML queries for tests table"""
@@ -236,6 +291,7 @@ class TestTestsDML:
         cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM requests;")
         cursor.execute("DELETE FROM controls;")
+        cursor.execute("DELETE FROM users;")
         db_conn.commit()
         cursor.close()
         yield
@@ -244,6 +300,7 @@ class TestTestsDML:
         cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM requests;")
         cursor.execute("DELETE FROM controls;")
+        cursor.execute("DELETE FROM users;")
         db_conn.commit()
         cursor.close()
 
@@ -308,6 +365,173 @@ class TestTestsDML:
         
         cursor.close()
 
+    def test_get_tests_by_request_id(self, db_conn):
+        """Test SELECT - Get tests by request_id"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Setup
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        request_id = cursor.fetchone()['request_id']
+        
+        # Create multiple controls for multiple tests
+        for i in range(2):
+            cursor.execute("INSERT INTO controls (vgcpid, control_owner) VALUES (%s, %s) RETURNING control_id", (f'VGCP-GR{i}', 'Owner'))
+            control_id = cursor.fetchone()['control_id']
+            # Create test with same request but different control
+            cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s)", (request_id, control_id, True, False, 'NOT_STARTED'))
+        db_conn.commit()
+        
+        # Retrieve tests
+        cursor.execute("SELECT * FROM tests WHERE request_id = %s", (request_id,))
+        results = cursor.fetchall()
+        
+        assert len(results) == 2
+        assert all(r['request_id'] == request_id for r in results)
+        
+        cursor.close()
+
+    def test_get_tests_by_control_id(self, db_conn):
+        """Test SELECT - Get tests by control_id"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Setup
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO controls (vgcpid, control_owner) VALUES (%s, %s) RETURNING control_id", ('VGCP-GC1', 'Owner'))
+        control_id = cursor.fetchone()['control_id']
+        
+        # Create multiple requests for multiple tests
+        for i in range(2):
+            cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", (f'Req{i}', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+            request_id = cursor.fetchone()['request_id']
+            # Create test with same control but different request
+            cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s)", (request_id, control_id, True, False, 'NOT_STARTED'))
+        db_conn.commit()
+        
+        # Retrieve tests
+        cursor.execute("SELECT * FROM tests WHERE control_id = %s", (control_id,))
+        results = cursor.fetchall()
+        
+        assert len(results) == 2
+        assert all(r['control_id'] == control_id for r in results)
+        
+        cursor.close()
+
+    def test_get_test_by_id(self, db_conn):
+        """Test SELECT - Get test by test_id"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Setup
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO controls (vgcpid, control_owner) VALUES (%s, %s) RETURNING control_id", ('VGCP-GT1', 'Owner'))
+        control_id = cursor.fetchone()['control_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        request_id = cursor.fetchone()['request_id']
+        
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
+        test_id = cursor.fetchone()['test_id']
+        db_conn.commit()
+        
+        # Retrieve it
+        cursor.execute("SELECT * FROM tests WHERE test_id = %s", (test_id,))
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result['test_id'] == test_id
+        
+        cursor.close()
+
+    def test_update_test_status_in_progress(self, db_conn):
+        """Test UPDATE - Set test status to IN_PROGRESS"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Setup
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO controls (vgcpid, control_owner) VALUES (%s, %s) RETURNING control_id", ('VGCP-IP1', 'Owner'))
+        control_id = cursor.fetchone()['control_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        request_id = cursor.fetchone()['request_id']
+        
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
+        test_id = cursor.fetchone()['test_id']
+        db_conn.commit()
+        
+        # Update to IN_PROGRESS
+        cursor.execute("UPDATE tests SET status = %s, start_date = current_date, updated_at = now() WHERE test_id = %s RETURNING *", ('IN_PROGRESS', test_id))
+        result = cursor.fetchone()
+        db_conn.commit()
+        
+        assert result['status'] == 'IN_PROGRESS'
+        assert result['start_date'] is not None
+        
+        cursor.close()
+
+    def test_update_test_status_in_review(self, db_conn):
+        """Test UPDATE - Set test status to IN_REVIEW"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Setup
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO controls (vgcpid, control_owner) VALUES (%s, %s) RETURNING control_id", ('VGCP-IR1', 'Owner'))
+        control_id = cursor.fetchone()['control_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        request_id = cursor.fetchone()['request_id']
+        
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
+        test_id = cursor.fetchone()['test_id']
+        db_conn.commit()
+        
+        # Update to IN_REVIEW
+        cursor.execute("UPDATE tests SET status = %s, complete_date = current_date, updated_at = now() WHERE test_id = %s RETURNING *", ('IN_REVIEW', test_id))
+        result = cursor.fetchone()
+        db_conn.commit()
+        
+        assert result['status'] == 'IN_REVIEW'
+        assert result['complete_date'] is not None
+        
+        cursor.close()
+
+    def test_update_test_status_completed(self, db_conn):
+        """Test UPDATE - Set test status to COMPLETED"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Setup
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO controls (vgcpid, control_owner) VALUES (%s, %s) RETURNING control_id", ('VGCP-COM1', 'Owner'))
+        control_id = cursor.fetchone()['control_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        request_id = cursor.fetchone()['request_id']
+        
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
+        test_id = cursor.fetchone()['test_id']
+        db_conn.commit()
+        
+        # Update to COMPLETED
+        cursor.execute("UPDATE tests SET status = %s, complete_date = current_date, updated_at = now() WHERE test_id = %s RETURNING *", ('COMPLETED', test_id))
+        result = cursor.fetchone()
+        db_conn.commit()
+        
+        assert result['status'] == 'COMPLETED'
+        assert result['complete_date'] is not None
+        
+        cursor.close()
+
 
 class TestCommentsDML:
     """Test DML queries for comments table"""
@@ -316,6 +540,7 @@ class TestCommentsDML:
     def setup_teardown(self, db_conn):
         """Setup and teardown for each test"""
         cursor = db_conn.cursor()
+        cursor.execute("DELETE FROM audit_logs;")
         cursor.execute("DELETE FROM comments;")
         cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM requests;")
@@ -325,6 +550,7 @@ class TestCommentsDML:
         cursor.close()
         yield
         cursor = db_conn.cursor()
+        cursor.execute("DELETE FROM audit_logs;")
         cursor.execute("DELETE FROM comments;")
         cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM requests;")
@@ -396,9 +622,56 @@ class TestCommentsDML:
         
         cursor.close()
 
+    def test_get_audit_trail_by_actor(self, db_conn):
+        """Test SELECT - Get audit trail by actor"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create user
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('auditor@test.com', 'MANAGER', 'Auditor'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
+        # Log multiple actions by this actor
+        for action in ['CREATE', 'UPDATE', 'DELETE']:
+            cursor.execute("""INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action)
+                              VALUES (%s, %s, %s, %s)""", (user_id, 'CONTROL', 10, action))
+        db_conn.commit()
+        
+        # Retrieve audit trail by actor
+        cursor.execute("SELECT * FROM audit_logs WHERE actor_user_id = %s ORDER BY changed_at DESC", (user_id,))
+        results = cursor.fetchall()
+        
+        assert len(results) == 3
+        assert all(r['actor_user_id'] == user_id for r in results)
+        
+        cursor.close()
 
-class TestAuditLogsDML:
-    """Test DML queries for audit_logs table"""
+    def test_get_all_audit_logs(self, db_conn):
+        """Test SELECT - Get all audit logs"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create user
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('auditor2@test.com', 'MANAGER', 'Auditor2'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
+        # Log some actions
+        for i in range(2):
+            cursor.execute("""INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action)
+                              VALUES (%s, %s, %s, %s)""", (user_id, 'TEST', i, 'CREATE'))
+        db_conn.commit()
+        
+        # Retrieve all audit logs
+        cursor.execute("SELECT * FROM audit_logs ORDER BY changed_at DESC")
+        results = cursor.fetchall()
+        
+        assert len(results) >= 2
+        
+        cursor.close()
+
+
+class TestUsersDML:
+    """Test DML queries for users table"""
 
     @pytest.fixture(autouse=True)
     def setup_teardown(self, db_conn):
@@ -415,14 +688,99 @@ class TestAuditLogsDML:
         db_conn.commit()
         cursor.close()
 
-    def test_log_audit_action(self, db_conn):
-        """Test INSERT - Log an audit action"""
+    def test_get_user_by_id(self, db_conn):
+        """Test SELECT - Get user by user_id"""
         cursor = db_conn.cursor(cursor_factory=RealDictCursor)
         
-        # Create a user to act as the auditor
-        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('auditor@test.com', 'MANAGER', 'Auditor'))
+        # Create a user
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('test@example.com', 'MANAGER', 'Test User'))
         user_id = cursor.fetchone()['user_id']
         db_conn.commit()
+        
+        # Retrieve it
+        cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result['email'] == 'test@example.com'
+        assert result['role'] == 'MANAGER'
+        
+        cursor.close()
+
+    def test_get_user_by_email(self, db_conn):
+        """Test SELECT - Get user by email"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create a user
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s)", ('user@test.com', 'TESTER', 'User'))
+        db_conn.commit()
+        
+        # Retrieve by email
+        cursor.execute("SELECT * FROM users WHERE email = %s", ('user@test.com',))
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result['email'] == 'user@test.com'
+        assert result['role'] == 'TESTER'
+        
+        cursor.close()
+
+    def test_get_all_active_users(self, db_conn):
+        """Test SELECT - Get all active users"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create multiple active users
+        for i in range(3):
+            cursor.execute("INSERT INTO users (email, role, display_name, is_active) VALUES (%s, %s, %s, %s)", (f'user{i}@test.com', 'MANAGER', f'User {i}', True))
+        
+        # Create one inactive user
+        cursor.execute("INSERT INTO users (email, role, display_name, is_active) VALUES (%s, %s, %s, %s)", ('inactive@test.com', 'TESTER', 'Inactive User', False))
+        db_conn.commit()
+        
+        # Retrieve active users
+        cursor.execute("SELECT * FROM users WHERE is_active = TRUE")
+        results = cursor.fetchall()
+        
+        assert len(results) == 3
+        assert all(r['is_active'] == True for r in results)
+        
+        cursor.close()
+
+    def test_create_user(self, db_conn):
+        """Test INSERT - Create a user"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        sql = """INSERT INTO users (email, role, display_name, is_active)
+                 VALUES (%s, %s, %s, TRUE)
+                 RETURNING *"""
+        
+        cursor.execute(sql, ('newuser@test.com', 'MANAGER', 'New User'))
+        result = cursor.fetchone()
+        db_conn.commit()
+        
+        assert result is not None
+        assert result['email'] == 'newuser@test.com'
+        assert result['role'] == 'MANAGER'
+        assert result['is_active'] == True
+        
+        cursor.close()
+
+    def test_update_user(self, db_conn):
+        """Test UPDATE - Update user"""
+        cursor = db_conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Create a user
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('update@test.com', 'TESTER', 'Original'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
+        # Update the user
+        cursor.execute("UPDATE users SET display_name = %s, role = %s WHERE user_id = %s RETURNING *", ('Updated User', 'MANAGER', user_id))
+        result = cursor.fetchone()
+        db_conn.commit()
+        
+        assert result['display_name'] == 'Updated User'
+        assert result['role'] == 'MANAGER'
         
         # Log an audit action
         sql = """INSERT INTO audit_logs (actor_user_id, entity_type, entity_id, action, before_snapshot, after_snapshot, reason)

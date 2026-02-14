@@ -71,31 +71,31 @@ SELECT * FROM tests WHERE control_id = %s;
 SELECT * FROM tests WHERE test_id = %s;
 
 -- Create test
-INSERT INTO tests (request_id, control_id, test_type, assigned_tester_id, status)
-VALUES (%s, %s, %s, %s, %s)
+INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, assigned_tester_id, status)
+VALUES (%s, %s, %s, %s, %s, %s)
 RETURNING *;
 
--- Update test progress
+-- Update test progress (DAT track)
 UPDATE tests 
-SET in_progress_step = %s, status = %s, updated_at = now() 
+SET dat_step = %s, status = %s, updated_at = now() 
 WHERE test_id = %s 
 RETURNING *;
 
 -- Update test status to IN_PROGRESS
 UPDATE tests
-SET testing_status = 'in_progress', start_date = current_date, updated_at = now()
+SET status = %s, start_date = current_date, updated_at = now()
 WHERE test_id = %s
 RETURNING *;
 
 -- Update test status to IN_REVIEW
 UPDATE tests
-SET testing_status = 'in_review', complete_date = current_date, updated_at = now()
+SET status = %s, complete_date = current_date, updated_at = now()
 WHERE test_id = %s
 RETURNING *;
 
 -- Update test status to COMPLETED
 UPDATE tests
-SET testing_status = 'completed', complete_date = current_date, updated_at = now()
+SET status = %s, complete_date = current_date, updated_at = now()
 WHERE test_id = %s
 RETURNING *;
 
@@ -107,9 +107,14 @@ SELECT * FROM comments WHERE test_id = %s ORDER BY posted_at DESC;
 -- Get comments by request_id
 SELECT * FROM comments WHERE request_id = %s ORDER BY posted_at DESC;
 
--- Create comment
-INSERT INTO comments (author_user_id, test_id, request_id, comment_text)
-VALUES (%s, %s, %s, %s)
+-- Create comment on test (test_id required, request_id NULL)
+INSERT INTO comments (author_user_id, test_id, comment_text)
+VALUES (%s, %s, %s)
+RETURNING *;
+
+-- Create comment on request (request_id required, test_id NULL)
+INSERT INTO comments (author_user_id, request_id, comment_text)
+VALUES (%s, %s, %s)
 RETURNING *;
 
 ---------- AUDIT LOG QUERIES ----------
