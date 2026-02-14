@@ -267,15 +267,16 @@ class TestTestsDML:
         db_conn.commit()
         
         # Create test
-        sql = """INSERT INTO tests (request_id, control_id, test_type, assigned_tester_id, status)
-                 VALUES (%s, %s, %s, %s, %s)
+        sql = """INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, assigned_tester_id, status)
+                 VALUES (%s, %s, %s, %s, %s, %s)
                  RETURNING *"""
-        cursor.execute(sql, (request_id, control_id, 'DAT', tester_id, 'NOT_STARTED'))
+        cursor.execute(sql, (request_id, control_id, True, False, tester_id, 'NOT_STARTED'))
         result = cursor.fetchone()
         db_conn.commit()
         
         assert result is not None
-        assert result['test_type'] == 'DAT'
+        assert result['requires_dat'] == True
+        assert result['requires_oet'] == False
         
         cursor.close()
 
@@ -293,12 +294,12 @@ class TestTestsDML:
         cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         
-        cursor.execute("INSERT INTO tests (request_id, control_id, test_type, status) VALUES (%s, %s, %s, %s) RETURNING test_id", (request_id, control_id, 'DAT', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
         test_id = cursor.fetchone()['test_id']
         db_conn.commit()
         
         # Update status - test IN_PROGRESS
-        sql = "UPDATE tests SET in_progress_step = %s, status = %s, updated_at = now() WHERE test_id = %s RETURNING *"
+        sql = "UPDATE tests SET dat_step = %s, status = %s, updated_at = now() WHERE test_id = %s RETURNING *"
         cursor.execute(sql, ('TESTING_IN_PROGRESS', 'IN_PROGRESS', test_id))
         result = cursor.fetchone()
         db_conn.commit()
@@ -346,15 +347,15 @@ class TestCommentsDML:
         cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         
-        cursor.execute("INSERT INTO tests (request_id, control_id, test_type, status) VALUES (%s, %s, %s, %s) RETURNING test_id", (request_id, control_id, 'DAT', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
         test_id = cursor.fetchone()['test_id']
         db_conn.commit()
         
         # Add comment
-        sql = """INSERT INTO comments (author_user_id, test_id, request_id, comment_text)
-                 VALUES (%s, %s, %s, %s)
+        sql = """INSERT INTO comments (author_user_id, test_id, comment_text)
+                 VALUES (%s, %s, %s)
                  RETURNING *"""
-        cursor.execute(sql, (user_id, test_id, request_id, 'This is a test comment'))
+        cursor.execute(sql, (user_id, test_id, 'This is a test comment'))
         result = cursor.fetchone()
         db_conn.commit()
         
@@ -377,13 +378,13 @@ class TestCommentsDML:
         cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         
-        cursor.execute("INSERT INTO tests (request_id, control_id, test_type, status) VALUES (%s, %s, %s, %s) RETURNING test_id", (request_id, control_id, 'DAT', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO tests (request_id, control_id, requires_dat, requires_oet, status) VALUES (%s, %s, %s, %s, %s) RETURNING test_id", (request_id, control_id, True, False, 'NOT_STARTED'))
         test_id = cursor.fetchone()['test_id']
         db_conn.commit()
         
         # Add multiple comments
         for i in range(3):
-            cursor.execute("INSERT INTO comments (author_user_id, test_id, request_id, comment_text) VALUES (%s, %s, %s, %s)", (user_id, test_id, request_id, f'Comment {i}'))
+            cursor.execute("INSERT INTO comments (author_user_id, test_id, comment_text) VALUES (%s, %s, %s)", (user_id, test_id, f'Comment {i}'))
         db_conn.commit()
         
         # Retrieve comments
