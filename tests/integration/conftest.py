@@ -25,10 +25,10 @@ def _get_admin_conn_params(dsn: str) -> dict:
     }
 
 def _run_psql_file(db_url: str, file_path: pathlib.Path, vars: dict = None):
-    '''
+    """
     Executes a SQL file using the psql CLI tool via subprocess.
     This is REQUIRED to support "if", "set", and other psql meta-commands.
-    '''
+    """
     # -v ON_ERROR_STOP=1 ensures the test fails if the SQL fails
     cmd = ["psql", db_url, "-v", "ON_ERROR_STOP=1", "-f", str(file_path)]
     
