@@ -72,7 +72,7 @@ class TestSchema:
         assert "is_active" in columns
         assert columns["vgcpid"][0] == "character varying"
         assert columns["control_owner"][1] == "NO"
-        assert columns["control_sme"][1] == "NO"
+        assert columns["control_sme"][1] == "YES"  # nullable in schema
         assert columns["escalation"][0] == "boolean"
         assert columns["is_active"][0] == "boolean"
 
@@ -89,20 +89,6 @@ class TestSchema:
         assert columns["due_date"][1] == "NO"
         assert columns["status"][2] == "request_status"
 
-    def test_tests_table_structure(self, db_conn):
-        """Verify tests table has expected columns with correct types"""
-        columns = _get_columns(db_conn, "tests")
-
-        assert "test_id" in columns
-        assert "request_id" in columns
-        assert "control_id" in columns
-        assert "test_type" in columns
-        assert "status" in columns
-        assert columns["request_id"][1] == "NO"
-        assert columns["control_id"][1] == "NO"
-        assert columns["test_type"][2] == "test_type"
-        assert columns["status"][2] == "test_status"
-
     def test_comments_table_structure(self, db_conn):
         """Verify comments table has expected columns with correct types"""
         columns = _get_columns(db_conn, "comments")
@@ -111,11 +97,11 @@ class TestSchema:
         assert "author_user_id" in columns
         assert "comment_text" in columns
         assert "posted_at" in columns
+        assert "test_id" in columns
+        assert "request_id" in columns
         assert columns["author_user_id"][1] == "NO"
         assert columns["comment_text"][1] == "NO"
-        assert columns["email"][1] == "NO"
-        assert columns["user_id"][1] == "NO"
-        assert columns["is_active"][1] == "NO"
+        assert columns["posted_at"][1] == "NO"
 
     def test_tests_table_structure(self, db_conn):
         """
@@ -199,18 +185,6 @@ class TestSchema:
 
         missing = expected - fks
         assert not missing, f"Missing foreign keys: {missing}"
-            cur.execute("""
-                SELECT constraint_name, table_name
-                FROM information_schema.table_constraints
-                WHERE constraint_type = 'FOREIGN KEY'
-                AND table_schema = 'public'
-            """)
-            fks = {row[0]: row[1] for row in cur.fetchall()}
-        
-        # Verify some key foreign keys exist
-        assert any('tests' in table for table in fks.values()), "Missing foreign keys in tests table"
-        assert any('comments' in table for table in fks.values()), "Missing foreign keys in comments table"
-        assert any('requests' in table for table in fks.values()), "Missing foreign keys in requests table"
 
     def test_enums_exist(self, db_conn):
         """Verify required ENUM types are defined"""
@@ -231,14 +205,14 @@ class TestSchema:
         """Verify enum values are correct"""
         expected = {
             "user_role": ["MANAGER", "TESTER"],
-            "request_status": ["NOT_STARTED", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "BLOCKED", "ARCHIVED"],
+            "request_status": ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "BLOCKED", "ARCHIVED"],
             "test_status": ["NOT_STARTED", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "BLOCKED", "ARCHIVED"],
-            "test_type": ["DAT", "OET"],
             "audit_action": ["CREATE", "UPDATE", "DELETE", "ROLLBACK"],
             "auditable_entity": ["CONTROL", "REQUEST", "TEST", "COMMENT", "USER"],
             "test_progress_step": [
                 "TESTING_READY",
                 "WALKTHROUGH_SCHEDULED",
+                "WALKTHROUGH_COMPLETED",
                 "TESTING_IN_PROGRESS",
                 "TESTING_BLOCKED",
                 "TESTING_CANCELED",
@@ -265,7 +239,8 @@ class TestSchema:
         expected = {
             "idx_tests_request",
             "idx_tests_control",
-            "idx_tests_type",
+            "idx_tests_dat_step",
+            "idx_tests_oet_step",
             "idx_tests_assigned",
             "idx_comments_test",
             "idx_comments_request",
