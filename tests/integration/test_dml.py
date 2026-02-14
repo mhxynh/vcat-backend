@@ -29,8 +29,8 @@ class TestControlsDML:
         """Test INSERT - Create a new control"""
         cursor = db_conn.cursor(cursor_factory=RealDictCursor)
         
-        sql = """INSERT INTO controls (vgcpid, description, control_owner, control_sme, escalation)
-                 VALUES (%s, %s, %s, %s, %s)
+        sql = """INSERT INTO controls (vgcpid, description, control_owner, control_sme, escalation, is_active)
+                 VALUES (%s, %s, %s, %s, %s, TRUE)
                  RETURNING *"""
         
         cursor.execute(sql, ('VGCP-001', 'Test Control', 'John Doe', 'Jane Smith', False))
@@ -98,10 +98,10 @@ class TestControlsDML:
         
         # Update it
         update_sql = """UPDATE controls
-                        SET description = %s, control_owner = %s 
+                        SET description = %s, control_owner = %s, control_sme = %s, escalation = %s, last_tested = %s
                         WHERE vgcpid = %s
                         RETURNING *"""
-        cursor.execute(update_sql, ('Updated Description', 'Owner2', 'VGCP-003'))
+        cursor.execute(update_sql, ('Updated Description', 'Owner2', 'SME2', True, '2026-01-15', 'VGCP-003'))
         result = cursor.fetchone()
         db_conn.commit()
         
@@ -251,18 +251,26 @@ class TestTestsDML:
         """Test INSERT - Create a new test"""
         cursor = db_conn.cursor(cursor_factory=RealDictCursor)
         
+        # Create a user for assigned_tester_id
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('tester@test.com', 'TESTER', 'Test Tester'))
+        tester_id = cursor.fetchone()['user_id']
+        
         # Create control and request first
         cursor.execute("INSERT INTO controls (vgcpid, control_owner, control_sme) VALUES (%s, %s, %s) RETURNING control_id", ('VGCP-T1', 'Owner', 'SME'))
         control_id = cursor.fetchone()['control_id']
         
-        cursor.execute("INSERT INTO requests (requestor, due_date, status) VALUES (%s, %s, %s) RETURNING request_id", ('Req', '2026-12-31', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'User'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
+        db_conn.commit()
         
         # Create test
-        sql = """INSERT INTO tests (request_id, control_id, test_type, status)
-                 VALUES (%s, %s, %s, %s)
+        sql = """INSERT INTO tests (request_id, control_id, test_type, assigned_tester_id, status)
+                 VALUES (%s, %s, %s, %s, %s)
                  RETURNING *"""
-        cursor.execute(sql, (request_id, control_id, 'DAT', 'NOT_STARTED'))
+        cursor.execute(sql, (request_id, control_id, 'DAT', tester_id, 'NOT_STARTED'))
         result = cursor.fetchone()
         db_conn.commit()
         
@@ -279,16 +287,19 @@ class TestTestsDML:
         cursor.execute("INSERT INTO controls (vgcpid, control_owner, control_sme) VALUES (%s, %s, %s) RETURNING control_id", ('VGCP-T2', 'Owner', 'SME'))
         control_id = cursor.fetchone()['control_id']
         
-        cursor.execute("INSERT INTO requests (requestor, due_date, status) VALUES (%s, %s, %s) RETURNING request_id", ('Req', '2026-12-31', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user2@test.com', 'MANAGER', 'User2'))
+        user_id = cursor.fetchone()['user_id']
+        
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         
         cursor.execute("INSERT INTO tests (request_id, control_id, test_type, status) VALUES (%s, %s, %s, %s) RETURNING test_id", (request_id, control_id, 'DAT', 'NOT_STARTED'))
         test_id = cursor.fetchone()['test_id']
         db_conn.commit()
         
-        # Update status
-        sql = "UPDATE tests SET status = %s WHERE test_id = %s RETURNING *"
-        cursor.execute(sql, ('IN_PROGRESS', test_id))
+        # Update status - test IN_PROGRESS
+        sql = "UPDATE tests SET in_progress_step = %s, status = %s, updated_at = now() WHERE test_id = %s RETURNING *"
+        cursor.execute(sql, ('TESTING_IN_PROGRESS', 'IN_PROGRESS', test_id))
         result = cursor.fetchone()
         db_conn.commit()
         
@@ -332,17 +343,18 @@ class TestCommentsDML:
         cursor.execute("INSERT INTO controls (vgcpid, control_owner, control_sme) VALUES (%s, %s, %s) RETURNING control_id", ('VGCP-C1', 'Owner', 'SME'))
         control_id = cursor.fetchone()['control_id']
         
-        cursor.execute("INSERT INTO requests (requestor, due_date, status) VALUES (%s, %s, %s) RETURNING request_id", ('Req', '2026-12-31', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         
         cursor.execute("INSERT INTO tests (request_id, control_id, test_type, status) VALUES (%s, %s, %s, %s) RETURNING test_id", (request_id, control_id, 'DAT', 'NOT_STARTED'))
         test_id = cursor.fetchone()['test_id']
+        db_conn.commit()
         
         # Add comment
-        sql = """INSERT INTO comments (author_user_id, test_id, comment_text)
-                 VALUES (%s, %s, %s)
+        sql = """INSERT INTO comments (author_user_id, test_id, request_id, comment_text)
+                 VALUES (%s, %s, %s, %s)
                  RETURNING *"""
-        cursor.execute(sql, (user_id, test_id, 'This is a test comment'))
+        cursor.execute(sql, (user_id, test_id, request_id, 'This is a test comment'))
         result = cursor.fetchone()
         db_conn.commit()
         
@@ -362,15 +374,16 @@ class TestCommentsDML:
         cursor.execute("INSERT INTO controls (vgcpid, control_owner, control_sme) VALUES (%s, %s, %s) RETURNING control_id", ('VGCP-C2', 'Owner', 'SME'))
         control_id = cursor.fetchone()['control_id']
         
-        cursor.execute("INSERT INTO requests (requestor, due_date, status) VALUES (%s, %s, %s) RETURNING request_id", ('Req', '2026-12-31', 'NOT_STARTED'))
+        cursor.execute("INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id", ('Req', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         
         cursor.execute("INSERT INTO tests (request_id, control_id, test_type, status) VALUES (%s, %s, %s, %s) RETURNING test_id", (request_id, control_id, 'DAT', 'NOT_STARTED'))
         test_id = cursor.fetchone()['test_id']
+        db_conn.commit()
         
         # Add multiple comments
         for i in range(3):
-            cursor.execute("INSERT INTO comments (author_user_id, test_id, comment_text) VALUES (%s, %s, %s)", (user_id, test_id, f'Comment {i}'))
+            cursor.execute("INSERT INTO comments (author_user_id, test_id, request_id, comment_text) VALUES (%s, %s, %s, %s)", (user_id, test_id, request_id, f'Comment {i}'))
         db_conn.commit()
         
         # Retrieve comments
