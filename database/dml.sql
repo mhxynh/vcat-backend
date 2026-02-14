@@ -57,7 +57,7 @@ VALUES (%s, %s, %s, %s, %s)
 RETURNING *;
 
 -- Update request status
-UPDATE requests SET status = %s, updated_at = now() WHERE request_id = %s RETURNING *;
+UPDATE requests SET status = %s WHERE request_id = %s RETURNING *;
 
 ---------- TESTS QUERIES ----------
 
