@@ -140,12 +140,14 @@ class TestRequestsDML:
         cursor = db_conn.cursor()
         cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM requests;")
+        cursor.execute("DELETE FROM users;")
         db_conn.commit()
         cursor.close()
         yield
         cursor = db_conn.cursor()
         cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM requests;")
+        cursor.execute("DELETE FROM users;")
         db_conn.commit()
         cursor.close()
 
@@ -153,17 +155,23 @@ class TestRequestsDML:
         """Test INSERT - Create a new request"""
         cursor = db_conn.cursor(cursor_factory=RealDictCursor)
         
-        sql = """INSERT INTO requests (requestor, due_date, status)
-                 VALUES (%s, %s, %s)
+        # Create a user first for created_by
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'Test User'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
+        sql = """INSERT INTO requests (requestor, start_date, due_date, status, created_by)
+                 VALUES (%s, %s, %s, %s, %s)
                  RETURNING *"""
         
-        cursor.execute(sql, ('John Requestor', '2026-12-31', 'NOT_STARTED'))
+        cursor.execute(sql, ('John Requestor', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         result = cursor.fetchone()
         db_conn.commit()
         
         assert result is not None
         assert result['requestor'] == 'John Requestor'
         assert result['status'] == 'NOT_STARTED'
+        assert result['start_date'].isoformat() == '2026-01-15'
         
         cursor.close()
 
@@ -171,10 +179,15 @@ class TestRequestsDML:
         """Test SELECT - Get all requests"""
         cursor = db_conn.cursor(cursor_factory=RealDictCursor)
         
+        # Create a user first for created_by
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'Test User'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
         # Insert requests
         for i in range(2):
-            sql = "INSERT INTO requests (requestor, due_date, status) VALUES (%s, %s, %s)"
-            cursor.execute(sql, (f'Requestor {i}', '2026-12-31', 'NOT_STARTED'))
+            sql = "INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s)"
+            cursor.execute(sql, (f'Requestor {i}', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         db_conn.commit()
         
         # Retrieve all
@@ -190,9 +203,14 @@ class TestRequestsDML:
         """Test UPDATE - Change request status"""
         cursor = db_conn.cursor(cursor_factory=RealDictCursor)
         
+        # Create a user first for created_by
+        cursor.execute("INSERT INTO users (email, role, display_name) VALUES (%s, %s, %s) RETURNING user_id", ('user@test.com', 'MANAGER', 'Test User'))
+        user_id = cursor.fetchone()['user_id']
+        db_conn.commit()
+        
         # Create a request
-        insert_sql = "INSERT INTO requests (requestor, due_date, status) VALUES (%s, %s, %s) RETURNING request_id"
-        cursor.execute(insert_sql, ('Requestor', '2026-12-31', 'NOT_STARTED'))
+        insert_sql = "INSERT INTO requests (requestor, start_date, due_date, status, created_by) VALUES (%s, %s, %s, %s, %s) RETURNING request_id"
+        cursor.execute(insert_sql, ('Requestor', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
         request_id = cursor.fetchone()['request_id']
         db_conn.commit()
         
