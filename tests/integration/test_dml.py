@@ -11,16 +11,16 @@ class TestControlsDML:
         """Setup and teardown for each test"""
         cursor = db_conn.cursor()
         # Clear dependents before controls to satisfy FKs
-        cursor.execute("DELETE FROM comments CASCADE;")
-        cursor.execute("DELETE FROM tests CASCADE;")
+        cursor.execute("DELETE FROM comments;")
+        cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM controls;")
         db_conn.commit()
         cursor.close()
         yield
         # Cleanup after test
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM comments CASCADE;")
-        cursor.execute("DELETE FROM tests CASCADE;")
+        cursor.execute("DELETE FROM comments;")
+        cursor.execute("DELETE FROM tests;")
         cursor.execute("DELETE FROM controls;")
         db_conn.commit()
         cursor.close()
@@ -138,14 +138,14 @@ class TestRequestsDML:
     def setup_teardown(self, db_conn):
         """Setup and teardown for each test"""
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM tests CASCADE;")
-        cursor.execute("DELETE FROM requests CASCADE;")
+        cursor.execute("DELETE FROM tests;")
+        cursor.execute("DELETE FROM requests;")
         db_conn.commit()
         cursor.close()
         yield
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM tests CASCADE;")
-        cursor.execute("DELETE FROM requests CASCADE;")
+        cursor.execute("DELETE FROM tests;")
+        cursor.execute("DELETE FROM requests;")
         db_conn.commit()
         cursor.close()
 
@@ -214,18 +214,18 @@ class TestTestsDML:
     def setup_teardown(self, db_conn):
         """Setup and teardown for each test"""
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM comments CASCADE;")
-        cursor.execute("DELETE FROM tests CASCADE;")
-        cursor.execute("DELETE FROM requests CASCADE;")
-        cursor.execute("DELETE FROM controls CASCADE;")
+        cursor.execute("DELETE FROM comments;")
+        cursor.execute("DELETE FROM tests;")
+        cursor.execute("DELETE FROM requests;")
+        cursor.execute("DELETE FROM controls;")
         db_conn.commit()
         cursor.close()
         yield
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM comments CASCADE;")
-        cursor.execute("DELETE FROM tests CASCADE;")
-        cursor.execute("DELETE FROM requests CASCADE;")
-        cursor.execute("DELETE FROM controls CASCADE;")
+        cursor.execute("DELETE FROM comments;")
+        cursor.execute("DELETE FROM tests;")
+        cursor.execute("DELETE FROM requests;")
+        cursor.execute("DELETE FROM controls;")
         db_conn.commit()
         cursor.close()
 
@@ -286,20 +286,20 @@ class TestCommentsDML:
     def setup_teardown(self, db_conn):
         """Setup and teardown for each test"""
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM comments CASCADE;")
-        cursor.execute("DELETE FROM tests CASCADE;")
-        cursor.execute("DELETE FROM requests CASCADE;")
-        cursor.execute("DELETE FROM controls CASCADE;")
-        cursor.execute("DELETE FROM users CASCADE;")
+        cursor.execute("DELETE FROM comments;")
+        cursor.execute("DELETE FROM tests;")
+        cursor.execute("DELETE FROM requests;")
+        cursor.execute("DELETE FROM controls;")
+        cursor.execute("DELETE FROM users;")
         db_conn.commit()
         cursor.close()
         yield
         cursor = db_conn.cursor()
-        cursor.execute("DELETE FROM comments CASCADE;")
-        cursor.execute("DELETE FROM tests CASCADE;")
-        cursor.execute("DELETE FROM requests CASCADE;")
-        cursor.execute("DELETE FROM controls CASCADE;")
-        cursor.execute("DELETE FROM users CASCADE;")
+        cursor.execute("DELETE FROM comments;")
+        cursor.execute("DELETE FROM tests;")
+        cursor.execute("DELETE FROM requests;")
+        cursor.execute("DELETE FROM controls;")
+        cursor.execute("DELETE FROM users;")
         db_conn.commit()
         cursor.close()
 
