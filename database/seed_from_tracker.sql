@@ -1027,7 +1027,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 7/10: Received updated information for DAT, making revisions on narrative
 7/1: DAT sent and under review by Cheryl
 7/1: Email requesting evidence and walkthrough mtg scheduled - 7/16
-6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
+6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_PROGRESS', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
     (89, 'VGCP-06736', 'SIEM rules are created through a formal process', '7/30: revisions made and DAT loaded to BP for approval
 7/29 CW: DAT ready for review. Let''s wait for the CSOC meeting to occur first before anything is approved in Archer (DAT and OET)
 7/29: OET loaded to BP and ready for approval
@@ -1038,7 +1038,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 7/10: Received updated information for DAT, making revisions on narrative
 7/1: DAT sent and under review by Cheryl
 7/1: Email requesting evidence and walkthrough mtg scheduled - 7/16
-6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
+6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_PROGRESS', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
     (90, 'VGCP-06737', 'SIEM rules are recertified annually through a formal process', '7/31: DAT submitted to BP for approval
 7/30: OET submitted to BP and ready for approval, DAT revisions made and ready for review
 7/29 CW: OET reviewed and ready for BP
@@ -1049,7 +1049,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 7/10: Received updated information for DAT, making revisions on narrative
 7/1: DAT sent and under review by Cheryl
 7/1: Email requesting evidence and walkthrough mtg scheduled - 7/16
-6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
+6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_PROGRESS', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
     (91, 'VGCP-06907', 'SWIFT lookup tables are recertified annually through a formal process', '7/30: OET loaded to BP and ready for approval
 7/29 CW: DAT approved in BP. OET reviewed and ready for BP
 7/29: Entered DAT into BP for approval
@@ -1171,7 +1171,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 8/20/2025- Will speak to Clara about this. No Q1 Risk report due to change of direction with SLAs
 8/15/25-Walkthrough complete
 8/8/25- Walkthrough scheduled for 8/15/25
-8/6/25- Emails sent out to Control owner/SME for a walkthrough ', 'Lemonds, Jason (040194)', NULL, FALSE, 'Jason', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', 'Testing In Progress', 'IN_REVIEW', NULL, '2025-08-29', '2025-08-29', NULL),
+8/6/25- Emails sent out to Control owner/SME for a walkthrough ', 'Lemonds, Jason (040194)', NULL, FALSE, 'Jason', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', 'Testing In Progress', 'IN_PROGRESS', NULL, '2025-08-29', '2025-08-29', NULL),
     (97, 'VGCP-05483', 'An ad hoc vulnerability scan profile is defined in a standardized procedure.', '8/21/2025 - OET Approved in Archer (JWM)
 8/20/2025 - DAT Approved in Archer (JWM)
 8/20/25-OET uploaded in Archer
@@ -1536,26 +1536,14 @@ JOIN c ON c.rn = s.rn
 JOIN r ON r.rn = s.rn;
 
 -- ----------------------------
--- COMMENTS: one request-level comment per row (tracker notes)
+-- COMMENTS: insert tracker information from test descriptions
 -- ----------------------------
-WITH
-src_for_comments AS (
-  SELECT
-    row_number() OVER (ORDER BY ref) AS rn,
-    notes
-  FROM src
-),
-req_for_comments AS (
-  SELECT request_id, row_number() OVER (ORDER BY request_id) AS rn
-  FROM requests
-)
-INSERT INTO comments (author_user_id, request_id, comment_text)
+INSERT INTO comments (author_user_id, test_id, comment_text)
 SELECT
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id LIMIT 1),
-  r.request_id,
-  COALESCE(s.notes, '')::text
-FROM src_for_comments s
-JOIN req_for_comments r ON r.rn = s.rn
-WHERE s.notes IS NOT NULL AND length(s.notes) > 0;
+  test_id,
+  description
+FROM tests
+WHERE description IS NOT NULL;
 
 COMMIT;
