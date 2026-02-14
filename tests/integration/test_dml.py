@@ -1,5 +1,6 @@
 import pytest
 import json
+from datetime import datetime, timedelta
 from psycopg2.extras import RealDictCursor
 
 
@@ -193,14 +194,16 @@ class TestRequestsDML:
                  VALUES (%s, %s, %s, %s, %s)
                  RETURNING *"""
         
-        cursor.execute(sql, ('John Requestor', '2026-01-15', '2026-12-31', 'NOT_STARTED', user_id))
+        start_date = datetime.now().date()
+        due_date = start_date + timedelta(days=350)
+        cursor.execute(sql, ('John Requestor', start_date, due_date, 'NOT_STARTED', user_id))
         result = cursor.fetchone()
         db_conn.commit()
         
         assert result is not None
         assert result['requestor'] == 'John Requestor'
         assert result['status'] == 'NOT_STARTED'
-        assert result['start_date'].isoformat() == '2026-01-15'
+        assert result['start_date'] == start_date
         
         cursor.close()
 
