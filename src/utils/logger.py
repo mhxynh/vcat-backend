@@ -13,7 +13,7 @@ class Logger:
         elapsed = f"{time.time() - cls.start_time:.3f}s"
         message = f"[{level} +{elapsed}]: {message}"
         if extra_fields:
-            message += f" Extra fields: {extra_fields}"
+            message += f" [Extra fields]: {extra_fields}"
         print(message)
 
     @staticmethod
