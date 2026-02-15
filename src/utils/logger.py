@@ -15,11 +15,3 @@ class Logger:
         if extra_fields:
             message += f" [Extra fields]: {extra_fields}"
         print(message)
-
-    @staticmethod
-    def http_response(status_code, payload):
-        return {
-            "statusCode": status_code,
-            "body": json.dumps(payload),
-            "headers": {"Content-Type": "application/json"},
-        }
