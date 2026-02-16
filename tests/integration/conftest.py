@@ -5,9 +5,11 @@ import pytest
 import psycopg2
 import subprocess
 from urllib.parse import urlparse
+from dotenv import load_dotenv
 
 # Define paths to your SQL files
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+load_dotenv(REPO_ROOT / ".env")
 SCHEMA_PATH = REPO_ROOT / "database" / "schema.sql"
 SEED_PATH = REPO_ROOT / "database" / "seed.sql"
 
@@ -25,7 +27,7 @@ def _get_admin_conn_params(dsn: str) -> dict:
 def _run_psql_file(db_url: str, file_path: pathlib.Path, vars: dict = None):
     """
     Executes a SQL file using the psql CLI tool via subprocess.
-    This is REQUIRED to support \if, \set, and other psql meta-commands.
+    This is REQUIRED to support "if", "set", and other psql meta-commands.
     """
     # -v ON_ERROR_STOP=1 ensures the test fails if the SQL fails
     cmd = ["psql", db_url, "-v", "ON_ERROR_STOP=1", "-f", str(file_path)]
@@ -52,6 +54,19 @@ def _run_psql_file(db_url: str, file_path: pathlib.Path, vars: dict = None):
     
     if result.returncode != 0:
         raise RuntimeError(f"psql failed executing {file_path.name}:\n{result.stderr}")
+
+def _set_db_env_from_dsn(dsn: str) -> None:
+    parsed = urlparse(dsn)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        raise ValueError("Unsupported database URL scheme")
+
+    db_name = parsed.path.lstrip("/")
+    os.environ["DB_HOST"] = parsed.hostname or ""
+    os.environ["DB_PORT"] = str(parsed.port or 5432)
+    os.environ["DB_NAME"] = db_name
+    os.environ["DB_USER"] = parsed.username or ""
+    os.environ["DB_PASSWORD"] = parsed.password or ""
+    os.environ.pop("DB_PASSWORD_SECRET_NAME", None)
 
 @pytest.fixture(scope="session")
 def test_db_url():
@@ -109,12 +124,86 @@ def test_db_url():
         finally:
             conn.close()
 
+@pytest.fixture(scope="session", autouse=True)
+def _use_temp_db_env(test_db_url):
+    keys = [
+        "DB_HOST",
+        "DB_PORT",
+        "DB_NAME",
+        "DB_USER",
+        "DB_PASSWORD",
+        "DB_PASSWORD_SECRET_NAME",
+    ]
+    old_env = {key: os.environ.get(key) for key in keys}
+    _set_db_env_from_dsn(test_db_url)
+    try:
+        yield
+    finally:
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
 @pytest.fixture
 def db_conn(test_db_url):
     """
     Provides a live psycopg2 connection to the temp database for tests.
     """
     conn = psycopg2.connect(test_db_url)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+@pytest.fixture(scope="function")
+def seed_db_url():
+    """
+    Separate fixture for seed tests - creates its own isolated database
+    so it's not affected by other tests deleting data
+    """
+    base_dsn = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+    admin_params = _get_admin_conn_params(base_dsn)
+    temp_db_name = f"vcat_test_seed_{uuid.uuid4().hex[:12]}"
+    
+    # Create admin connection
+    admin_conn = psycopg2.connect(**admin_params)
+    admin_conn.autocommit = True
+    try:
+        with admin_conn.cursor() as cur:
+            cur.execute(f'CREATE DATABASE "{temp_db_name}"')
+    finally:
+        admin_conn.close()
+    
+    # Construct temp DSN
+    parsed = urlparse(base_dsn)
+    temp_dsn = f"postgresql://{parsed.username}:{parsed.password}@{parsed.hostname}:{parsed.port}/{temp_db_name}"
+    
+    # Apply schema + seed
+    try:
+        _run_psql_file(temp_dsn, SCHEMA_PATH)
+        _run_psql_file(temp_dsn, SEED_PATH)
+        
+        yield temp_dsn
+    finally:
+        # Cleanup: drop temp db
+        admin_conn = psycopg2.connect(**admin_params)
+        admin_conn.autocommit = True
+        try:
+            with admin_conn.cursor() as cur:
+                cur.execute(f"""
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE datname = '{temp_db_name}' AND pid <> pg_backend_pid()
+                """)
+                cur.execute(f'DROP DATABASE IF EXISTS "{temp_db_name}"')
+        finally:
+            admin_conn.close()
+
+@pytest.fixture
+def seed_db_conn(seed_db_url):
+    """Connection to the isolated seed test database"""
+    conn = psycopg2.connect(seed_db_url)
     try:
         yield conn
     finally:

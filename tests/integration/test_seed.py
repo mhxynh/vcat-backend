@@ -3,16 +3,16 @@ import pytest
 class TestSeedData:
     """Test seed.sql generates expected data"""
 
-    def test_seed_runs_and_has_data(self, db_conn):
+    def test_seed_runs_and_has_data(self, seed_db_conn):
         """Verify seed created users"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM users")
             user_count = cur.fetchone()[0]
         assert user_count > 0, "No users created from seed"
 
-    def test_seed_creates_managers_and_testers(self, db_conn):
+    def test_seed_creates_managers_and_testers(self, seed_db_conn):
         """Verify seed creates both manager and tester roles"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("""
                 SELECT role, COUNT(*) as count
                 FROM users
@@ -25,26 +25,26 @@ class TestSeedData:
         assert roles["MANAGER"] >= 1, "Should have at least 1 manager"
         assert roles["TESTER"] >= 1, "Should have at least 1 tester"
 
-    def test_seed_creates_controls(self, db_conn):
+    def test_seed_creates_controls(self, seed_db_conn):
         """Verify seed creates controls"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM controls")
             control_count = cur.fetchone()[0]
         assert control_count > 0, "No controls created from seed"
 
-    def test_seed_creates_requests(self, db_conn):
+    def test_seed_creates_requests(self, seed_db_conn):
         """Verify seed creates requests"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM requests")
             request_count = cur.fetchone()[0]
         assert request_count > 0, "No requests created from seed"
 
-    def test_seed_creates_tests_with_tracks(self, db_conn):
+    def test_seed_creates_tests_with_tracks(self, seed_db_conn):
         """
         Verify seed creates tests and assigns DAT/OET requirements correctly.
         Checks that boolean flags are working and we have a mix of types.
         """
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM tests")
             test_count = cur.fetchone()[0]
             
@@ -66,12 +66,12 @@ class TestSeedData:
         # Based on your seed logic (80% both), this should be true
         assert both_count > 0, "No tests requiring BOTH tracks created"
 
-    def test_seed_test_steps_alignment(self, db_conn):
+    def test_seed_test_steps_alignment(self, seed_db_conn):
         """
         Verify that if a track is required, it has a valid step, 
         and if not required, the step is NULL.
         """
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             # 1. Verify Integrity: requires_dat=TRUE implies dat_step is NOT NULL
             cur.execute("""
                 SELECT COUNT(*) FROM tests 
@@ -89,9 +89,9 @@ class TestSeedData:
         assert invalid_dat == 0, "Found tests requiring DAT but having NULL dat_step"
         assert dirty_dat == 0, "Found tests NOT requiring DAT but having a dat_step value"
 
-    def test_seed_creates_comments(self, db_conn):
+    def test_seed_creates_comments(self, seed_db_conn):
         """Verify seed creates comments on requests and tests"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM comments")
             comment_count = cur.fetchone()[0]
             
@@ -109,9 +109,9 @@ class TestSeedData:
         assert request_comments > 0, "No request-level comments created"
         assert test_comments > 0, "No test-level comments created"
 
-    def test_seed_foreign_keys_valid(self, db_conn):
+    def test_seed_foreign_keys_valid(self, seed_db_conn):
         """Verify seed data respects foreign key constraints"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             # Check that all test assignments reference valid users
             cur.execute("""
                 SELECT COUNT(*)
@@ -145,9 +145,9 @@ class TestSeedData:
         assert invalid_creator_refs == 0, "Requests reference non-existent creator users"
         assert invalid_author_refs == 0, "Comments reference non-existent author users"
 
-    def test_seed_request_status_values_valid(self, db_conn):
+    def test_seed_request_status_values_valid(self, seed_db_conn):
         """Verify all request statuses are valid enum values"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("""
                 SELECT DISTINCT status
                 FROM requests
@@ -157,9 +157,9 @@ class TestSeedData:
             
         assert statuses.issubset(valid_statuses), f"Invalid request statuses: {statuses - valid_statuses}"
 
-    def test_seed_test_status_values_valid(self, db_conn):
+    def test_seed_test_status_values_valid(self, seed_db_conn):
         """Verify all test statuses are valid enum values"""
-        with db_conn.cursor() as cur:
+        with seed_db_conn.cursor() as cur:
             cur.execute("""
                 SELECT DISTINCT status
                 FROM tests
