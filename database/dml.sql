@@ -64,6 +64,17 @@ UPDATE requests SET status = %s WHERE request_id = %s RETURNING *;
 -- Get tests by request_id
 SELECT * FROM tests WHERE request_id = %s;
 
+-- Get tests by request_id WITH Control Details
+SELECT 
+    t.*, 
+    c.vgcpid, 
+    c.description AS control_description, 
+    u.display_name AS tester_name
+FROM tests t
+JOIN controls c ON t.control_id = c.control_id
+LEFT JOIN users u ON t.assigned_tester_id = u.user_id
+WHERE t.request_id = %s;
+
 -- Get tests by control_id
 SELECT * FROM tests WHERE control_id = %s;
 
@@ -77,25 +88,33 @@ RETURNING *;
 
 -- Update test progress (DAT track)
 UPDATE tests 
-SET dat_step = %s, status = %s, updated_at = now() 
+SET dat_step = %s, status = %s 
 WHERE test_id = %s 
 RETURNING *;
 
--- Update test status to IN_PROGRESS
+-- Update test progress (OET track)
+UPDATE tests 
+SET oet_step = %s, status = %s 
+WHERE test_id = %s 
+RETURNING *;
+
+-- Update test status to IN_PROGRESS (Tester starts work / or Manager loops back)
 UPDATE tests
-SET status = %s, start_date = current_date, updated_at = now()
+SET status = 'IN_PROGRESS', 
+    start_date = COALESCE(start_date, current_date) -- Only set if it's the first time starting
 WHERE test_id = %s
 RETURNING *;
 
--- Update test status to IN_REVIEW
+-- Update test status to IN_REVIEW (Tester finishes work, waits for manager)
 UPDATE tests
-SET status = %s, complete_date = current_date, updated_at = now()
+SET status = 'IN_REVIEW'
 WHERE test_id = %s
 RETURNING *;
 
--- Update test status to COMPLETED
+-- Update test status to COMPLETED (Manager approves)
 UPDATE tests
-SET status = %s, complete_date = current_date, updated_at = now()
+SET status = 'COMPLETED', 
+    complete_date = current_date
 WHERE test_id = %s
 RETURNING *;
 
