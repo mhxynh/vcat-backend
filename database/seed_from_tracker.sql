@@ -1027,7 +1027,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 7/10: Received updated information for DAT, making revisions on narrative
 7/1: DAT sent and under review by Cheryl
 7/1: Email requesting evidence and walkthrough mtg scheduled - 7/16
-6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
+6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_PROGRESS', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
     (89, 'VGCP-06736', 'SIEM rules are created through a formal process', '7/30: revisions made and DAT loaded to BP for approval
 7/29 CW: DAT ready for review. Let''s wait for the CSOC meeting to occur first before anything is approved in Archer (DAT and OET)
 7/29: OET loaded to BP and ready for approval
@@ -1038,7 +1038,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 7/10: Received updated information for DAT, making revisions on narrative
 7/1: DAT sent and under review by Cheryl
 7/1: Email requesting evidence and walkthrough mtg scheduled - 7/16
-6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
+6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_PROGRESS', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
     (90, 'VGCP-06737', 'SIEM rules are recertified annually through a formal process', '7/31: DAT submitted to BP for approval
 7/30: OET submitted to BP and ready for approval, DAT revisions made and ready for review
 7/29 CW: OET reviewed and ready for BP
@@ -1049,7 +1049,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 7/10: Received updated information for DAT, making revisions on narrative
 7/1: DAT sent and under review by Cheryl
 7/1: Email requesting evidence and walkthrough mtg scheduled - 7/16
-6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
+6/30: SNOW ticket opened for mtg request', 'Reitnauer, Jonathan (030822)', 'Christina Duke/Cheryl Texter', FALSE, 'Sara', 'IN_REVIEW', 'Testing Completed', 'COMPLETED', 'Testing Completed', 'IN_PROGRESS', '2025-07-01', '2025-07-31', '2025-07-31', '2025-07-31'),
     (91, 'VGCP-06907', 'SWIFT lookup tables are recertified annually through a formal process', '7/30: OET loaded to BP and ready for approval
 7/29 CW: DAT approved in BP. OET reviewed and ready for BP
 7/29: Entered DAT into BP for approval
@@ -1171,7 +1171,7 @@ Smit Patel', FALSE, 'Jason', 'COMPLETED', 'Testing In Progress', 'COMPLETED', 'T
 8/20/2025- Will speak to Clara about this. No Q1 Risk report due to change of direction with SLAs
 8/15/25-Walkthrough complete
 8/8/25- Walkthrough scheduled for 8/15/25
-8/6/25- Emails sent out to Control owner/SME for a walkthrough ', 'Lemonds, Jason (040194)', NULL, FALSE, 'Jason', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', 'Testing In Progress', 'IN_REVIEW', NULL, '2025-08-29', '2025-08-29', NULL),
+8/6/25- Emails sent out to Control owner/SME for a walkthrough ', 'Lemonds, Jason (040194)', NULL, FALSE, 'Jason', 'COMPLETED', 'Testing Completed', 'IN_REVIEW', 'Testing In Progress', 'IN_PROGRESS', NULL, '2025-08-29', '2025-08-29', NULL),
     (97, 'VGCP-05483', 'An ad hoc vulnerability scan profile is defined in a standardized procedure.', '8/21/2025 - OET Approved in Archer (JWM)
 8/20/2025 - DAT Approved in Archer (JWM)
 8/20/25-OET uploaded in Archer
@@ -1485,76 +1485,65 @@ s AS (
   FROM src
 )
 -- ----------------------------
--- TESTS: two per row (DAT + OET)
+-- TESTS: one per request/control pair with DAT and OET tracking
 -- ----------------------------
 INSERT INTO tests (
-  request_id, control_id, test_type, assigned_tester_id,
-  description, start_date, estimated_date, complete_date,
-  in_progress_step, status
+  request_id, control_id, requires_dat, requires_oet, 
+  dat_step, oet_step, assigned_tester_id,
+  description, start_date, estimated_date, complete_date, status
 )
 SELECT
   r.request_id,
   c.control_id,
-  t.track::test_type,
+  TRUE,  -- requires_dat
+  TRUE,  -- requires_oet
+  CASE s.dat_step
+    WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
+    WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
+    WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+    WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
+    WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
+    WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
+    WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+    WHEN 'Walkthrough Completed' THEN 'WALKTHROUGH_COMPLETED'::test_progress_step
+    ELSE NULL
+  END AS dat_step,
+  CASE s.oet_step
+    WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
+    WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
+    WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
+    WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
+    WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
+    WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
+    WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
+    WHEN 'Walkthrough Completed' THEN 'WALKTHROUGH_COMPLETED'::test_progress_step
+    ELSE NULL
+  END AS oet_step,
   (SELECT user_id FROM users u
    WHERE lower(u.display_name) = lower(s.assigned_tester_name)
    LIMIT 1) AS assigned_tester_id,
-  format('%s test for %s', t.track, s.vgcpid) AS description,
+  s.title AS description,
   s.date_started::date,
   s.eta::date,
   s.date_completed::date,
   CASE 
-    WHEN t.track='DAT' THEN 
-      CASE s.dat_step
-        WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
-        WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
-        WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
-        WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
-        WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
-        WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
-        WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
-        WHEN 'Walkthrough Completed' THEN 'COMPLETED'::test_progress_step
-        ELSE NULL
-      END
-    ELSE 
-      CASE s.oet_step
-        WHEN 'Testing Ready' THEN 'TESTING_READY'::test_progress_step
-        WHEN 'Walkthrough Scheduled' THEN 'WALKTHROUGH_SCHEDULED'::test_progress_step
-        WHEN 'Testing In Progress' THEN 'TESTING_IN_PROGRESS'::test_progress_step
-        WHEN 'Testing Completed' THEN 'COMPLETED'::test_progress_step
-        WHEN 'Testing Blocked' THEN 'TESTING_BLOCKED'::test_progress_step
-        WHEN 'Testing Canceled' THEN 'TESTING_CANCELED'::test_progress_step
-        WHEN 'Addressing Comments' THEN 'ADDRESSING_COMMENTS'::test_progress_step
-        WHEN 'Walkthrough Completed' THEN 'COMPLETED'::test_progress_step
-        ELSE NULL
-      END
-  END AS in_progress_step,
-  CASE WHEN t.track='DAT' THEN s.dat_status::test_status ELSE s.oet_status::test_status END AS status
+    WHEN s.dat_status::text = 'COMPLETED' AND s.oet_status::text = 'COMPLETED' THEN 'COMPLETED'::test_status
+    ELSE (CASE WHEN s.dat_status::text IN ('BLOCKED', 'ARCHIVED') OR s.oet_status::text IN ('BLOCKED', 'ARCHIVED') 
+          THEN 'BLOCKED'::test_status ELSE 'IN_PROGRESS'::test_status END)
+  END AS status
 FROM s
 JOIN c ON c.rn = s.rn
-JOIN r ON r.rn = s.rn
-CROSS JOIN (VALUES ('DAT'), ('OET')) AS t(track);
+JOIN r ON r.rn = s.rn;
 
 -- ----------------------------
--- COMMENTS: one request-level comment per row (tracker notes)
+-- COMMENTS: insert tracker information from test descriptions
 -- ----------------------------
-WITH 
-c AS (
-  SELECT control_id, description, row_number() OVER (ORDER BY control_id) AS rn
-  FROM controls
-),
-r AS (
-  SELECT request_id, row_number() OVER (ORDER BY request_id) AS rn
-  FROM requests
-)
-INSERT INTO comments (author_user_id, request_id, test_id, comment_text)
+INSERT INTO comments (author_user_id, test_id, comment_text)
 SELECT
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id LIMIT 1),
-  r.request_id,
-  NULL::bigint,
-  COALESCE(c.description, '')::text
-FROM c
-JOIN r ON r.rn = c.rn
-WHERE c.description IS NOT NULL AND length(c.description) > 0;
+  test_id,
+  description
+FROM tests
+WHERE description IS NOT NULL;
 
 COMMIT;
