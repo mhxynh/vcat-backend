@@ -24,6 +24,7 @@ wheels/
 .env
 .env.prod
 .venv
+env.json
 env/
 venv/
 ENV/

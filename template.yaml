@@ -7,30 +7,50 @@ Description: >
 Globals:
   Function:
     Timeout: 3
-    CodeUri: src/
+    Runtime: python3.12
+    Architectures: [x86_64]
     Environment:
       Variables:
         DB_HOST: !Ref dbHostParam
+        DB_NAME: vcat_sandbox
+        DB_USER: !Ref dbUserParam
         DB_PASSWORD: !Ref dbPasswordParam
-    # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
     LoggingConfig:
       LogFormat: JSON
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
 
 Parameters:
   dbHostParam:
     Type: String
+  dbUserParam:
+    Type: String
+    Default: postgres
   dbPasswordParam:
     Type: String
     NoEcho: true
 
 Resources:
+  CommonDependencyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: vcat-common-layer
+      Description: Shared utilities (db_utils, logger, crud)
+      ContentUri: src/functions/common/python/
+      CompatibleRuntimes:
+        - python3.12
+    Metadata:
+      BuildMethod: python3.12
   ControlsFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      Handler: functions.controls.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/controls/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         GetControls:
           Type: Api
@@ -56,10 +76,10 @@ Resources:
   CatalogFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.catalog.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/catalog/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         GetCatalog:
           Type: Api
@@ -70,10 +90,10 @@ Resources:
   RequestsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.requests.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/requests/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         GetRequests:
           Type: Api
@@ -84,10 +104,10 @@ Resources:
   CommentsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.comments.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/comments/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         GetComments:
           Type: Api
@@ -98,10 +118,10 @@ Resources:
   AuditFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.audit.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/audit/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         GetAudit:
           Type: Api
@@ -112,10 +132,10 @@ Resources:
   ExportFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.exporting.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/exporting/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         ExportApi:
           Type: Api
@@ -126,10 +146,10 @@ Resources:
   NotificationsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: functions.notifications.main.lambda_handler
-      Runtime: python3.12
-      Architectures:
-        - x86_64
+      CodeUri: src/functions/notifications/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
       Events:
         GetNotifications:
           Type: Api
