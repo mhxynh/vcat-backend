@@ -12,11 +12,9 @@ _Describe the changes briefly. What logic, endpoint, or database change does thi
 
 _By checking these boxes, you confirm this PR is not "bloated":_
 
-[ ] **Single Purpose**: This PR addresses only the ticket listed above.
-
-[ ] **No Hidden Refactors**: I have NOT refactored or reformatted code in files unrelated to this ticket.
-
-[ ] **Template Accuracy**: If I changed `template.yaml`, I have verified only the necessary resources were added.
+- [ ] **Single Purpose**: This PR addresses only the ticket listed above.
+- [ ] **No Hidden Refactors**: I have NOT refactored or reformatted code in files unrelated to this ticket.
+- [ ] **Template Accuracy**: If I changed `template.yaml`, I have verified only the necessary resources were added.
 
 ## Test Walkthrough (Required)
 
@@ -32,19 +30,15 @@ Attach a screenshot of your terminal logs OR a snippet from your database client
 
 ## Database & Infrastructure
 
-[ ] **Schema Change**: Does this PR modify the database schema? (If yes, list the tables affected).
-
-[ ] **Environment Variables**: Does this require new keys in the `.env.example` and `env.json.example` file?
-
-[ ] **Dependencies**: I have added any new libraries to `requirements.txt`.
+- [ ] **Schema Change**: Does this PR modify the database schema? (If yes, list the tables affected).
+- [ ] **Environment Variables**: Does this require new keys in the `.env.example` and `env.json.example` file?
+- [ ] **Dependencies**: I have added any new libraries to `requirements.txt`.
 
 ## Quality Standards
 
-[ ] **Black**: I ran `black .` to format the code.
-
-[ ] **Flake8**: I ran `flake8` and fixed any naming convention errors (snake_case).
-
-[ ] **DB Connection**: I verified the connection to the RDS/Sandbox DB.
+- [ ] **Black**: I ran `black .` to format the code.
+- [ ] **Flake8**: I ran `flake8` and fixed any naming convention errors (snake_case).
+- [ ] **DB Connection**: I verified the connection to the RDS/Sandbox DB.
 
 ## Reviewer’s "Quick Reject" Criteria
 
