@@ -16,7 +16,7 @@ This repository contains the serverless infrastructure and API logic for the Van
 3. **Configure Environment**: We use two files to manage secrets. This file is **git-ignored** to keep our database secure.
    - File 1: `.env` (Used by local utility scripts)
      - `cp .env.example .env`
-     - Fill in the `DB_PASSWORD` from the team’s `#references` channel.
+     - Fill in the `DB_PASSWORD`
    - File 2: `env.json` (Used by Docker/SAM)
      - `cp env.json.example env.json`
      - Ensure the `DB_PASSWORD` matches your `.env`
