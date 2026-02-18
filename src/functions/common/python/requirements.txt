@@ -1,7 +1,5 @@
 # Local development dependencies
-pytest
 boto3
 requests
 psycopg2-binary
 python-dotenv
-aws-sam-cli

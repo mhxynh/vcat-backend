@@ -12,7 +12,7 @@ Globals:
     Environment:
       Variables:
         DB_HOST: !Ref dbHostParam
-        DB_NAME: vcat_sandbox
+        DB_NAME: !Ref dbNameParam
         DB_USER: !Ref dbUserParam
         DB_PASSWORD: !Ref dbPasswordParam
     LoggingConfig:
@@ -26,6 +26,9 @@ Globals:
 Parameters:
   dbHostParam:
     Type: String
+  dbNameParam:
+    Type: String
+    default: postgres
   dbUserParam:
     Type: String
     Default: postgres
