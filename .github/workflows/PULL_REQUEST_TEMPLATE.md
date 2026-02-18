@@ -34,7 +34,7 @@ Attach a screenshot of your terminal logs OR a snippet from your database client
 
 [ ] **Schema Change**: Does this PR modify the database schema? (If yes, list the tables affected).
 
-[ ] **Environment Variables**: Does this require new keys in the `.env` file?
+[ ] **Environment Variables**: Does this require new keys in the `.env.example` and `env.json.example` file?
 
 [ ] **Dependencies**: I have added any new libraries to `requirements.txt`.
 
