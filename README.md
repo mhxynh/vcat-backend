@@ -13,13 +13,33 @@ This repository contains the serverless infrastructure and API logic for the Van
    - Guide you through the aws configure process if you aren't connected yet.
    - Automatically `run pip install -r requirements.txt`.
 
-3. **Configure Environment**: We use two files to manage secrets. This file is git-ignored to keep our database secure.
+3. **Configure Environment**: We use two files to manage secrets. This file is **git-ignored** to keep our database secure.
    - File 1: `.env` (Used by local utility scripts)
      - `cp .env.example .env`
      - Fill in the `DB_PASSWORD` from the team’s `#references` channel.
    - File 2: `env.json` (Used by Docker/SAM)
      - `cp env.json.example env.json`
      - Ensure the `DB_PASSWORD` matches your `.env`
+
+## Local Database Setup (Sandbox)
+
+If you are working on database schema changes or want to test without an internet connection, you need to initialize your local PostgreSQL "Sandbox."
+
+Run these commands **once** to create and seed your local DB:
+
+```
+# 1. Create the database
+createdb -U postgres vcat_sandbox
+
+# 2. Initialize the schema
+psql -U postgres -d vcat_sandbox -f database/schema.sql
+
+# 3. Seed with initial data
+psql -U postgres -d vcat_sandbox -f database/seed.sql
+
+# 4. Verify setup (should return rows)
+psql -d vcat_sandbox -U postgres -c "SELECT * FROM controls;"
+```
 
 ## Backend Local Development
 
