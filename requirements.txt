@@ -1,5 +1,5 @@
 # Local development dependencies
-pytest
+coverage
 boto3
 requests
 psycopg2-binary
