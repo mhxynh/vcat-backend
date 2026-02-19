@@ -29,8 +29,6 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=95
-        env:
-          PYTHONPATH: src
 
       - name: Show test summary
         if: always()
