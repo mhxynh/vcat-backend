@@ -22,7 +22,9 @@ wheels/
 
 # Virtual Environments (Where your local libraries live)
 .env
+.env.prod
 .venv
+env.json
 env/
 venv/
 ENV/
