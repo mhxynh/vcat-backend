@@ -1,6 +1,7 @@
 [tool.coverage.run]
 source = ["src"]
 branch = true
+omit = ["__init__*", "conftest*"]
 
 [tool.coverage.report]
 show_missing = true
