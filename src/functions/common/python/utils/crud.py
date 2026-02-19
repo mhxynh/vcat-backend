@@ -1,4 +1,4 @@
-from utils.db_utils import DbUtils
+from db_utils import DbUtils
 from utils.logger import Logger
 
 class CrudUtils:
