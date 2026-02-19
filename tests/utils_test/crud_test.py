@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 from utils.crud import CrudUtils
 
 class TestCrudUtils(TestCase):
-
     def _mock_connection(self, rows, fetchone=False):
         # Helper to create a mock connection with a cursor that returns rows.
         mock_conn = MagicMock()
@@ -16,9 +15,8 @@ class TestCrudUtils(TestCase):
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         return mock_conn, mock_cursor
 
-    @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
-    def test_get_all_returns_list(self, mock_db, mock_logger):
+    def test_get_all_returns_list(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection([
             {"control_id": 1, "vgcpid": "VGCP-001"},
             {"control_id": 2, "vgcpid": "VGCP-002"},
@@ -27,21 +25,20 @@ class TestCrudUtils(TestCase):
 
         result = CrudUtils.get_all("controls", condition="is_active = TRUE")
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["vgcpid"], "VGCP-001")
         mock_cursor.execute.assert_called_once_with("SELECT * FROM controls WHERE is_active = TRUE")
         mock_conn.close.assert_called_once()
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["vgcpid"], "VGCP-001")
 
-    @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
-    def test_get_all_returns_empty_list(self, mock_db, mock_logger):
+    def test_get_all_returns_empty_list(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection([])
         mock_db.get_db_connection.return_value = mock_conn
 
         result = CrudUtils.get_all("controls")
 
-        self.assertEqual(result, [])
         mock_conn.close.assert_called_once()
+        self.assertEqual(result, [])
 
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
@@ -51,7 +48,7 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.get_all("controls")
 
-        mock_logger.log.assert_called_once()
+        mock_logger.log.assert_called_with(level="ERROR", message="Error fetching all records", extra_fields={"error": "DB down", "table": "controls", "condition": "TRUE"})
 
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
@@ -69,9 +66,8 @@ class TestCrudUtils(TestCase):
         )
         mock_conn.close.assert_called_once()
 
-    @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
-    def test_get_by_id_returns_none_when_not_found(self, mock_db, mock_logger):
+    def test_get_by_id_returns_none_when_not_found(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
@@ -88,7 +84,7 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.get_by_id("controls", "vgcpid", "VGCP-001")
 
-        mock_logger.log.assert_called_once()
+        mock_logger.log.assert_called_once_with(level="ERROR", message="Error fetching record by ID", extra_fields={'error': 'DB down', 'table': 'controls', 'pk_column': 'vgcpid', 'pk_value': 'VGCP-001'})
 
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
@@ -117,11 +113,10 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.create("controls", ["vgcpid"], ["VGCP-999"])
 
-        mock_logger.log.assert_called_once()
+        mock_logger.log.assert_called_with(level="ERROR", message="Error creating record", extra_fields={"error": "DB down", "table": "controls", "columns": ["vgcpid"]})
 
-    @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
-    def test_update_returns_updated_record(self, mock_db, mock_logger):
+    def test_update_returns_updated_record(self, mock_db):
         updated_row = {"control_id": 1, "vgcpid": "VGCP-001", "description": "Updated"}
         mock_conn, mock_cursor = self._mock_connection(updated_row, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
@@ -129,17 +124,16 @@ class TestCrudUtils(TestCase):
         updates = {"description": "Updated"}
         result = CrudUtils.update("controls", "vgcpid", "VGCP-001", updates)
 
-        self.assertEqual(result["description"], "Updated")
         mock_cursor.execute.assert_called_once_with(
             "UPDATE controls SET description = %s WHERE vgcpid = %s RETURNING *",
             ["Updated", "VGCP-001"]
         )
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
+        self.assertEqual(result["description"], "Updated")
 
-    @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
-    def test_update_returns_none_when_not_found(self, mock_db, mock_logger):
+    def test_update_returns_none_when_not_found(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
@@ -156,4 +150,4 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.update("controls", "vgcpid", "VGCP-001", {"description": "X"})
 
-        mock_logger.log.assert_called_once()
+        mock_logger.log.assert_called_once_with(level="ERROR", message="Error updating record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001", "updates": {"description": "X"}})

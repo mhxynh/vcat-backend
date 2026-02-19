@@ -26,7 +26,7 @@ class TestDBUtils(TestCase):
     @patch('psycopg2.connect', side_effect=Exception("Connection failed"))
     @patch.dict(os.environ, MOCK_ENV)
     def test_get_db_connection_exception(self, mock_connect, mock_logger):
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(Exception):
             DbUtils.get_db_connection()
 
         mock_connect.assert_called_once()
@@ -35,7 +35,7 @@ class TestDBUtils(TestCase):
     @patch('utils.db_utils.Logger')
     @patch.dict(os.environ, {}, clear=True)
     def test_get_db_connection_missing_env_vars(self, mock_logger):
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(Exception):
             DbUtils.get_db_connection()
 
         mock_logger.log.assert_any_call(level="ERROR", message="Missing required database environment variables", extra_fields={"missing": ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']})

@@ -32,6 +32,5 @@ class TestLogger(TestCase):
         Logger.log(level="WARNING", message="Elapsed check")
 
         output = mock_print.call_args[0][0]
-        # Verify the elapsed time format: [WARNING +X.XXXs]
         self.assertRegex(output, r"\[WARNING \+\d+\.\d{3}s\]")
         
