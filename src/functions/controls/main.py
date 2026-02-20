@@ -48,10 +48,7 @@ def lambda_handler(event, context):
         # GET /controls/{vgcpid} : Get a single control by vgcpid
         if method == Methods.GET:
             vgcpid = extract_vgcpid(event, normalized_path)
-            if vgcpid is None:
-                Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path")
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "VGCPID not provided"})
-
+            
             control = CrudUtils.get_by_id("controls", "vgcpid", vgcpid)
             if not control:
                 Logger.log(level=LogLevels.WARNING, message="Control not found", extra_fields={"vgcpid": vgcpid})

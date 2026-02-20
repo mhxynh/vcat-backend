@@ -1,0 +1,13 @@
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["__init__*", "conftest*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 95
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "src/functions/common/python"]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=95"
