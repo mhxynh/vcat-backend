@@ -24,9 +24,9 @@ class TestCrudUtils(TestCase):
         ])
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = CrudUtils.get_all("controls", condition="is_active = TRUE")
+        result = CrudUtils.get_all("controls")
 
-        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls WHERE is_active = TRUE")
+        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls")
         mock_conn.close.assert_called_once()
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["vgcpid"], "VGCP-001")
@@ -49,7 +49,7 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.get_all("controls")
 
-        mock_logger.log.assert_called_with(level="ERROR", message="Error fetching all records", extra_fields={"error": "DB down", "table": "controls", "condition": "TRUE"})
+        mock_logger.log.assert_called_with(level="ERROR", message="Error fetching all records", extra_fields={"error": "DB down", "table": "controls"})
 
     # Get by ID
     @patch('utils.crud.Logger')

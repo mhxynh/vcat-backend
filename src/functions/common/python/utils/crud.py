@@ -3,17 +3,17 @@ from utils.logger import Logger
 
 class CrudUtils:
     @staticmethod
-    def get_all(table, condition="TRUE"):
+    def get_all(table):
         try:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"SELECT * FROM {table} WHERE {condition}")
+                    cur.execute(f"SELECT * FROM {table}")
                     return [dict(row) for row in cur.fetchall()]
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching all records", extra_fields={"error": str(e), "table": table, "condition": condition})
+            Logger.log(level="ERROR", message="Error fetching all records", extra_fields={"error": str(e), "table": table})
             raise e
 
     @staticmethod
