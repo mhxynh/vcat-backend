@@ -51,8 +51,9 @@ if __name__ == "__main__":
     '''
     parser = argparse.ArgumentParser(description="Invoke a Lambda locally with a simulated API Gateway event")
     parser.add_argument("--lambda-name", default="controls", help="Lambda function folder name (e.g., 'controls')")
-    parser.add_argument("--method", default="GET", help="HTTP method")
-    parser.add_argument("--vgcpid", default=None, help="Resource ID for /controls/{vgcpid}")
+    parser.add_argument("--method", default="DELETE", help="HTTP method")
+    parser.add_argument("--vgcpid", default="VGCP-99999", help="Resource ID for /controls/{vgcpid}")
+    parser.add_argument("--params", default='{"hard": "true"}', help='Query params as JSON object (e.g. {"hard": "true"}). Only JSON accepted.')
     # Body is provided for testing the POST /controls endpoint. Adjust as needed: "{"vgcpid": "VGCP-99999", "description": "Description for control 21", "control_owner": "Owner 67", "control_sme": "SME 5"}"
     parser.add_argument("--body", default=None, help="JSON body string for POST/PUT")
     parser.add_argument("--env", default="local", choices=["local", "prod"], help="Environment: local or prod (default: local)")
@@ -78,7 +79,12 @@ if __name__ == "__main__":
     if args.body:
         body = json.loads(args.body)
 
-    event = build_event(args.method, path, path_parameters, body)
+    # Parse query parameters if provided
+    query_params = None
+    if args.params:
+        query_params = json.loads(args.params)
+
+    event = build_event(args.method, path, path_parameters, body, query_params)
     context = {}
 
     print(f">>> {args.method} {path}")

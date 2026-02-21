@@ -4,11 +4,12 @@ from unittest.mock import patch
 import functions.controls.main as controls
 
 class TestControlsMain(TestCase):
-    def _build_event(self, method, path, body=None, path_params=None):
+    def _build_event(self, method, path, body=None, path_params=None, query_params=None):
         event = {
             "httpMethod": method,
             "path": path,
             "pathParameters": path_params or {},
+            "queryStringParameters": query_params or {},
         }
         if body is not None:
             event["body"] = json.dumps(body)
@@ -141,6 +142,68 @@ class TestControlsMain(TestCase):
         result = controls.lambda_handler(event, None)
 
         mock_logger.log.assert_any_call(level="ERROR", message="VGCPID not provided in path")
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("VGCPID not provided", json.loads(result["body"])["error"])
+
+    # DELETE /controls/{vgcpid}
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
+    def test_delete_control_returns_200(self, mock_crud, mock_logger):
+        mock_crud.deactivate.return_value = {"vgcpid": "VGCP-001", "is_active": False}
+
+        event = self._build_event("DELETE", "/controls/VGCP-001", path_params={"vgcpid": "VGCP-001"})
+        result = controls.lambda_handler(event, None)
+
+        mock_logger.log.assert_any_call(level="INFO", message="Deactivated control", extra_fields={"vgcpid": "VGCP-001"})
+        self.assertEqual(result["statusCode"], 200)
+        self.assertFalse(json.loads(result["body"])["is_active"])
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
+    def test_delete_control_hard_delete_returns_200(self, mock_crud, mock_logger):
+        mock_crud.hard_delete.return_value = {"vgcpid": "VGCP-001"}
+
+        event = self._build_event("DELETE", "/controls/VGCP-001", path_params={"vgcpid": "VGCP-001"}, query_params={"hard": "true"})
+        result = controls.lambda_handler(event, None)
+
+        mock_crud.hard_delete.assert_called_once_with("controls", "vgcpid", "VGCP-001")
+        mock_logger.log.assert_any_call(level="INFO", message="Hard deleted control", extra_fields={"vgcpid": "VGCP-001"})
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"])["vgcpid"], "VGCP-001")
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
+    def test_delete_control_not_found_returns_404(self, mock_crud, mock_logger):
+        mock_crud.deactivate.return_value = None
+
+        event = self._build_event("DELETE", "/controls/VGCP-999", path_params={"vgcpid": "VGCP-999"})
+        result = controls.lambda_handler(event, None)
+
+        mock_logger.log.assert_any_call(level="WARNING", message="Control not found for deactivate", extra_fields={"vgcpid": "VGCP-999"})
+        self.assertEqual(result["statusCode"], 404)
+        self.assertIn("Control not found", json.loads(result["body"])["error"])
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
+    def test_delete_control_hard_delete_not_found_returns_404(self, mock_crud, mock_logger):
+        mock_crud.hard_delete.return_value = None
+
+        event = self._build_event("DELETE", "/controls/VGCP-999", path_params={"vgcpid": "VGCP-999"}, query_params={"hard": "true"})
+        result = controls.lambda_handler(event, None)
+
+        mock_crud.hard_delete.assert_called_once_with("controls", "vgcpid", "VGCP-999")
+        mock_logger.log.assert_any_call(level="WARNING", message="Control not found for hard delete", extra_fields={"vgcpid": "VGCP-999"})
+        self.assertEqual(result["statusCode"], 404)
+        self.assertIn("Control not found", json.loads(result["body"])["error"])
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
+    def test_delete_control_missing_vgcpid_returns_400(self, mock_crud, mock_logger):
+        event = self._build_event("DELETE", "/controls/", path_params={})
+        result = controls.lambda_handler(event, None)
+
+        mock_logger.log.assert_any_call(level="ERROR", message="VGCPID not provided in path for delete")
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("VGCPID not provided", json.loads(result["body"])["error"])
 
