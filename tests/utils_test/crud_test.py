@@ -158,7 +158,7 @@ class TestCrudUtils(TestCase):
 
     # Deactivate (soft delete)
     @patch('utils.crud.DbUtils')
-    def test_deactivate_returns_updated_record(self, mock_db):
+    def test_deactivate_success(self, mock_db):
         updated_row = {"control_id": 1, "vgcpid": "VGCP-001", "is_active": False}
         mock_conn, mock_cursor = self._mock_connection(updated_row, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
@@ -182,7 +182,7 @@ class TestCrudUtils(TestCase):
 
     # Hard Delete
     @patch('utils.crud.DbUtils')
-    def test_hard_delete_returns_deleted_record(self, mock_db):
+    def test_hard_delete_success(self, mock_db):
         deleted_row = {"control_id": 1, "vgcpid": "VGCP-001"}
         mock_conn, mock_cursor = self._mock_connection(deleted_row, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
