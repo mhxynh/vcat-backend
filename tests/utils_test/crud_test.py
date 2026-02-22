@@ -24,9 +24,9 @@ class TestCrudUtils(TestCase):
         ])
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = CrudUtils.get_all("controls", condition="is_active = TRUE")
+        result = CrudUtils.get_all("controls")
 
-        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls WHERE is_active = TRUE")
+        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls")
         mock_conn.close.assert_called_once()
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["vgcpid"], "VGCP-001")
@@ -49,7 +49,7 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.get_all("controls")
 
-        mock_logger.log.assert_called_with(level="ERROR", message="Error fetching all records", extra_fields={"error": "DB down", "table": "controls", "condition": "TRUE"})
+        mock_logger.log.assert_called_with(level="ERROR", message="Error fetching all records", extra_fields={"error": "DB down", "table": "controls"})
 
     # Get by ID
     @patch('utils.crud.Logger')
@@ -155,3 +155,61 @@ class TestCrudUtils(TestCase):
             CrudUtils.update("controls", "vgcpid", "VGCP-001", {"description": "X"})
 
         mock_logger.log.assert_called_once_with(level="ERROR", message="Error updating record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001", "updates": {"description": "X"}})
+
+    # Deactivate (soft delete)
+    @patch('utils.crud.DbUtils')
+    def test_deactivate_success(self, mock_db):
+        updated_row = {"control_id": 1, "vgcpid": "VGCP-001", "is_active": False}
+        mock_conn, mock_cursor = self._mock_connection(updated_row, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.deactivate("controls", "vgcpid", "VGCP-001")
+
+        mock_cursor.execute.assert_called_once_with("UPDATE controls SET is_active = FALSE WHERE vgcpid = %s RETURNING *", ("VGCP-001",))
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+        self.assertEqual(result["is_active"], False)
+
+    @patch('utils.crud.Logger')
+    @patch('utils.crud.DbUtils')
+    def test_deactivate_raises_and_logs_on_error(self, mock_db, mock_logger):
+        mock_db.get_db_connection.side_effect = Exception("DB down")
+
+        with self.assertRaises(Exception):
+            CrudUtils.deactivate("controls", "vgcpid", "VGCP-001")
+
+        mock_logger.log.assert_called_once_with(level="ERROR", message="Error deactivating record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001"})
+
+    # Hard Delete
+    @patch('utils.crud.DbUtils')
+    def test_hard_delete_success(self, mock_db):
+        deleted_row = {"control_id": 1, "vgcpid": "VGCP-001"}
+        mock_conn, mock_cursor = self._mock_connection(deleted_row, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.hard_delete("controls", "vgcpid", "VGCP-001")
+
+        mock_cursor.execute.assert_called_once_with("DELETE FROM controls WHERE vgcpid = %s RETURNING *", ("VGCP-001",))
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+        self.assertEqual(result["vgcpid"], "VGCP-001")
+
+    @patch('utils.crud.DbUtils')
+    def test_hard_delete_returns_none_when_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.hard_delete("controls", "vgcpid", "VGCP-999")
+
+        self.assertIsNone(result)
+        mock_conn.close.assert_called_once()
+
+    @patch('utils.crud.Logger')
+    @patch('utils.crud.DbUtils')
+    def test_hard_delete_raises_and_logs_on_error(self, mock_db, mock_logger):
+        mock_db.get_db_connection.side_effect = Exception("DB down")
+
+        with self.assertRaises(Exception):
+            CrudUtils.hard_delete("controls", "vgcpid", "VGCP-001")
+
+        mock_logger.log.assert_called_once_with(level="ERROR", message="Error hard deleting record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001"})

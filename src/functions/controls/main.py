@@ -39,9 +39,9 @@ def lambda_handler(event, context):
         normalized_path = path.rstrip("/")
         method = method.upper()
 
-        # GET /controls : List all active controls
+        # GET /controls : List all controls (active and inactive)
         if method == Methods.GET and normalized_path == "/controls":
-            controls = CrudUtils.get_all("controls", condition="is_active = TRUE")
+            controls = CrudUtils.get_all("controls")
             Logger.log(level=LogLevels.INFO, message="Returning controls", extra_fields={"count": len(controls)})
             return ResponseUtils.http_response(StatusCodes.OK, controls)
 
@@ -107,6 +107,34 @@ def lambda_handler(event, context):
 
             Logger.log(level=LogLevels.INFO, message="Updated control", extra_fields={"vgcpid": vgcpid})
             return ResponseUtils.http_response(StatusCodes.OK, updated)
+        
+        # DELETE /controls/{vgcpid} : Soft-deactivate or hard-delete a control by vgcpid
+        if method == Methods.DELETE:
+            vgcpid = extract_vgcpid(event, normalized_path)
+            if vgcpid is None:
+                Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path for delete")
+                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "VGCPID not provided"})
+
+            params = event.get("queryStringParameters", {})
+            hard_flag = str(params.get("hard", "false")).lower() if params else "false"
+            hard = hard_flag == "true"
+
+            if hard:
+                deleted = CrudUtils.hard_delete("controls", "vgcpid", vgcpid)
+                if not deleted:
+                    Logger.log(level=LogLevels.WARNING, message="Control not found for hard delete", extra_fields={"vgcpid": vgcpid})
+                    return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Control not found", "vgcpid": vgcpid})
+
+                Logger.log(level=LogLevels.INFO, message="Hard deleted control", extra_fields={"vgcpid": vgcpid})
+                return ResponseUtils.http_response(StatusCodes.OK, deleted)
+            else:
+                deactivated = CrudUtils.deactivate("controls", "vgcpid", vgcpid)
+                if not deactivated:
+                    Logger.log(level=LogLevels.WARNING, message="Control not found for deactivate", extra_fields={"vgcpid": vgcpid})
+                    return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Control not found", "vgcpid": vgcpid})
+
+                Logger.log(level=LogLevels.INFO, message="Deactivated control", extra_fields={"vgcpid": vgcpid})
+                return ResponseUtils.http_response(StatusCodes.OK, deactivated)
 
         Logger.log(level=LogLevels.WARNING, message="Method not allowed", extra_fields={"method": method, "path": normalized_path})
         return ResponseUtils.http_response(StatusCodes.METHOD_NOT_ALLOWED, {"error": f"Method {method} not allowed on path {normalized_path}"})

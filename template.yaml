@@ -75,6 +75,11 @@ Resources:
           Properties:
             Path: /controls/{vgcpid}
             Method: put
+        DeleteControl:
+          Type: Api
+          Properties:
+            Path: /controls/{vgcpid}
+            Method: delete
 
   CatalogFunction:
     Type: AWS::Serverless::Function

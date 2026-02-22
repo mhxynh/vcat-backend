@@ -3,17 +3,17 @@ from utils.logger import Logger
 
 class CrudUtils:
     @staticmethod
-    def get_all(table, condition="TRUE"):
+    def get_all(table):
         try:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"SELECT * FROM {table} WHERE {condition}")
+                    cur.execute(f"SELECT * FROM {table}")
                     return [dict(row) for row in cur.fetchall()]
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching all records", extra_fields={"error": str(e), "table": table, "condition": condition})
+            Logger.log(level="ERROR", message="Error fetching all records", extra_fields={"error": str(e), "table": table})
             raise e
 
     @staticmethod
@@ -64,4 +64,36 @@ class CrudUtils:
                 conn.close()
         except Exception as e:
             Logger.log(level="ERROR", message="Error updating record", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value, "updates": updates})
+            raise e
+
+    @staticmethod
+    def deactivate(table, pk_column, pk_value):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"UPDATE {table} SET is_active = FALSE WHERE {pk_column} = %s RETURNING *", (pk_value,))
+                    conn.commit()
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(level="ERROR", message="Error deactivating record", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value})
+            raise e
+
+    @staticmethod
+    def hard_delete(table, pk_column, pk_value):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"DELETE FROM {table} WHERE {pk_column} = %s RETURNING *", (pk_value,))
+                    conn.commit()
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(level="ERROR", message="Error hard deleting record", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value})
             raise e
