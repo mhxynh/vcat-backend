@@ -165,7 +165,7 @@ class TestCrudUtils(TestCase):
 
         result = CrudUtils.deactivate("controls", "vgcpid", "VGCP-001")
 
-        mock_cursor.execute.assert_called_once_with("UPDATE controls SET is_active = FALSE WHERE vgcpid = %s RETURNING *", "VGCP-001")
+        mock_cursor.execute.assert_called_once_with("UPDATE controls SET is_active = FALSE WHERE vgcpid = %s RETURNING *", ("VGCP-001",))
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
         self.assertEqual(result["is_active"], False)

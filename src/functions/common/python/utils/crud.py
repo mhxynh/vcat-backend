@@ -72,7 +72,7 @@ class CrudUtils:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"UPDATE {table} SET is_active = FALSE WHERE {pk_column} = %s RETURNING *", (pk_value))
+                    cur.execute(f"UPDATE {table} SET is_active = FALSE WHERE {pk_column} = %s RETURNING *", (pk_value,))
                     conn.commit()
                     row = cur.fetchone()
                     return dict(row) if row else None
