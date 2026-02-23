@@ -28,7 +28,7 @@ Parameters:
     Type: String
   dbNameParam:
     Type: String
-    default: postgres
+    Default: postgres
   dbUserParam:
     Type: String
     Default: postgres
