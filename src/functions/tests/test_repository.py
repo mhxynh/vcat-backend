@@ -34,7 +34,7 @@ class TestRepository:
                 with conn.cursor() as cur:
                     query = """
                         UPDATE tests
-                        SET dat_step = %s, status = %s
+                        SET dat_step = COALESCE(%s, dat_step), status = COALESCE(%s, status)
                         WHERE test_id = %s
                         RETURNING *;
                     """
@@ -56,7 +56,7 @@ class TestRepository:
                 with conn.cursor() as cur:
                     query = """
                         UPDATE tests
-                        SET oet_step = %s, status = %s
+                        SET oet_step = COALESCE(%s, oet_step), status = COALESCE(%s, status)
                         WHERE test_id = %s
                         RETURNING *;
                     """

@@ -1,6 +1,6 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
-from utils.test_repository import TestRepository
+from functions.tests.test_repository import TestRepository
 
 class TestTestRepository(TestCase):
     def _mock_connection(self, rows, fetchone=False):
@@ -16,7 +16,7 @@ class TestTestRepository(TestCase):
 
     # get_tests_by_request_with_details
 
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_get_tests_by_request_with_details_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection([
             {"test_id": 1, "request_id": 100, "vgcpid": "VGCP-001", "tester_name": "Alice"}
@@ -36,8 +36,8 @@ class TestTestRepository(TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["tester_name"], "Alice")
 
-    @patch('utils.test_repository.Logger')
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_get_tests_by_request_with_details_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 
@@ -52,7 +52,7 @@ class TestTestRepository(TestCase):
 
     # update_dat_track
 
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_dat_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
             {"test_id": 42, "dat_step": "Phase 2", "status": "IN_PROGRESS"}, fetchone=True
@@ -70,8 +70,8 @@ class TestTestRepository(TestCase):
         mock_conn.close.assert_called_once()
         self.assertEqual(result["dat_step"], "Phase 2")
 
-    @patch('utils.test_repository.Logger')
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_dat_track_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 
@@ -86,7 +86,7 @@ class TestTestRepository(TestCase):
 
         # update_oet_track
 
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_oet_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
             {"test_id": 42, "oet_step": "Step 1", "status": "IN_PROGRESS"}, fetchone=True
@@ -104,8 +104,8 @@ class TestTestRepository(TestCase):
         mock_conn.close.assert_called_once()
         self.assertEqual(result["oet_step"], "Step 1")
 
-    @patch('utils.test_repository.Logger')
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_oet_track_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 
@@ -120,7 +120,7 @@ class TestTestRepository(TestCase):
 
     # start_test
 
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_start_test_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
             {"test_id": 42, "status": "IN_PROGRESS"}, fetchone=True
@@ -137,8 +137,8 @@ class TestTestRepository(TestCase):
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "IN_PROGRESS")
 
-    @patch('utils.test_repository.Logger')
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_start_test_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 
@@ -153,7 +153,7 @@ class TestTestRepository(TestCase):
 
     # complete_test
 
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_complete_test_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
             {"test_id": 42, "status": "COMPLETED"}, fetchone=True
@@ -170,8 +170,8 @@ class TestTestRepository(TestCase):
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "COMPLETED")
 
-    @patch('utils.test_repository.Logger')
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_complete_test_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 
@@ -186,7 +186,7 @@ class TestTestRepository(TestCase):
 
     # review_test
 
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_review_test_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
             {"test_id": 42, "status": "IN_REVIEW"}, fetchone=True
@@ -202,8 +202,8 @@ class TestTestRepository(TestCase):
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "IN_REVIEW")
 
-    @patch('utils.test_repository.Logger')
-    @patch('utils.test_repository.DbUtils')
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
     def test_review_test_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 

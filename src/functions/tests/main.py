@@ -1,7 +1,7 @@
 import json
 from constants.common_variables import LogLevels, Methods, StatusCodes
 from utils.crud import CrudUtils
-from utils.test_repository import TestRepository
+from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
 
