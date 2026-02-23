@@ -46,7 +46,7 @@ SELECT
 FROM generate_series(1, :CONTROLS) AS s(i);
 
 -- 3. REQUESTS
-INSERT INTO requests (requestor, start_date, due_date, complete_date, status, created_by)
+INSERT INTO requests (requestor, start_date, due_date, complete_date, status, priority, created_by)
 SELECT
   format('Requester %s', ((i - 1) % 10) + 1),
   (current_date - ((i - 1) % 14))::date,
@@ -57,6 +57,8 @@ SELECT
     WHEN i % 2 = 0 THEN 'IN_PROGRESS'::request_status
     ELSE 'NOT_STARTED'::request_status
   END,
+  -- Generate a random priority
+  (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[FLOOR(RANDOM() * 4 + 1)],
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % :MANAGERS) LIMIT 1)
 FROM generate_series(1, :REQUESTS) AS s(i);
 
@@ -71,8 +73,10 @@ INSERT INTO tests (
   dat_step,
   oet_step,
   status,
+  priority,
   start_date, 
   estimated_date, 
+  due_date,
   complete_date
 )
 SELECT
@@ -93,7 +97,7 @@ SELECT
   CASE WHEN (s.i % 10) != 1 THEN TRUE ELSE FALSE END AS requires_dat,
   CASE WHEN (s.i % 10) != 0 THEN TRUE ELSE FALSE END AS requires_oet,
 
-  -- STEP GENERATION LOGIC (Must match requirements exactly):
+  -- STEP GENERATION LOGIC:
   -- If DAT is required (same logic as above), generate a random step.
   CASE 
      WHEN (s.i % 10) != 1 THEN 
@@ -101,7 +105,7 @@ SELECT
      ELSE NULL 
   END AS dat_step,
   
-  -- If OET is required (same logic as above), generate a random step.
+  -- If OET is required, generate a random step.
   CASE 
      WHEN (s.i % 10) != 0 THEN 
         (ARRAY['TESTING_READY', 'TESTING_IN_PROGRESS', 'COMPLETED', 'ADDRESSING_COMMENTS']::test_progress_step[])[FLOOR(RANDOM() * 4 + 1)]
@@ -111,10 +115,14 @@ SELECT
   -- Overall Test Status
   (ARRAY['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED']::test_status[])[FLOOR(RANDOM() * 4 + 1)] AS status,
 
+  -- Generate a random priority for the test
+  (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[FLOOR(RANDOM() * 4 + 1)] AS priority,
+
   -- Dates
-  current_date - 5,
-  current_date + 5,
-  NULL
+  current_date - 5, -- start_date
+  current_date + 5, -- estimated_date
+  current_date + 10, -- due_date
+  NULL -- complete_date
 FROM generate_series(1, :CONTROLS) AS s(i);
 
 -- 5. COMMENTS

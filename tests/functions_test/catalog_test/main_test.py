@@ -1,6 +1,6 @@
 import json
 from unittest import TestCase
-from functions.catalog.main import lambda_handler
+from functions.tests.main import lambda_handler
 
 class TestCatalogMain(TestCase):
     def test_lambda_handler_returns_200(self):

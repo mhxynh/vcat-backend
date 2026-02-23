@@ -32,6 +32,20 @@ class CrudUtils:
             raise e
 
     @staticmethod
+    def get_by_filter(table, column, value):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"SELECT * FROM {table} WHERE {column} = %s", (value,))
+                    return [dict(row) for row in cur.fetchall()]
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(level="ERROR", message="Error fetching records by filter", extra_fields={"error": str(e), "table": table, "column": column, "value": value})
+            raise e
+
+    @staticmethod
     def create(table, columns, values):
         try:
             conn = DbUtils.get_db_connection()
