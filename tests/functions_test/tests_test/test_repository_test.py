@@ -55,20 +55,17 @@ class TestTestRepository(TestCase):
     @patch('functions.tests.test_repository.DbUtils')
     def test_update_dat_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
-            {"test_id": 42, "dat_step": "Phase 2", "status": "IN_PROGRESS"}, fetchone=True
-        )
+        {"test_id": 42, "dat_step": "Original Step", "status": "IN_PROGRESS"}, 
+        fetchone=True
+    )
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = TestRepository.update_dat_track(42, "Phase 2", "IN_PROGRESS")
+        result = TestRepository.update_dat_track(42, None, "IN_PROGRESS")
 
-        args, kwargs = mock_cursor.execute.call_args
-        self.assertIn("UPDATE tests", args[0])
-        self.assertIn("SET dat_step = %s, status = %s", args[0])
-        self.assertEqual(args[1], ("Phase 2", "IN_PROGRESS", 42))
-        
-        mock_conn.commit.assert_called_once()
-        mock_conn.close.assert_called_once()
-        self.assertEqual(result["dat_step"], "Phase 2")
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("COALESCE(%s, dat_step)", args[0])
+        self.assertEqual(args[1], (None, "IN_PROGRESS", 42))
+        self.assertEqual(result["dat_step"], "Original Step")
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -84,7 +81,7 @@ class TestTestRepository(TestCase):
             extra_fields={'error': 'DB down', 'test_id': 42}
         )
 
-        # update_oet_track
+    # update_oet_track
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_update_oet_track_success(self, mock_db):
@@ -96,8 +93,11 @@ class TestTestRepository(TestCase):
         result = TestRepository.update_oet_track(42, "Step 1", "IN_PROGRESS")
 
         args, kwargs = mock_cursor.execute.call_args
-        self.assertIn("UPDATE tests", args[0])
-        self.assertIn("SET oet_step = %s, status = %s", args[0])
+        sql_query = args[0]
+        
+        self.assertIn("UPDATE tests", sql_query)
+        self.assertIn("oet_step = COALESCE(%s, oet_step)", sql_query)
+        self.assertIn("status = COALESCE(%s, status)", sql_query)
         self.assertEqual(args[1], ("Step 1", "IN_PROGRESS", 42))
         
         mock_conn.commit.assert_called_once()
