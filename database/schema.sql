@@ -27,6 +27,10 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
+    CREATE TYPE request_priority AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
     CREATE TYPE audit_action AS ENUM ('CREATE', 'UPDATE', 'DELETE', 'ROLLBACK');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -72,6 +76,7 @@ CREATE TABLE IF NOT EXISTS requests (
     due_date        DATE NOT NULL,
     complete_date   DATE,
     status          request_status NOT NULL DEFAULT 'NOT_STARTED',
+    priority        request_priority NOT NULL DEFAULT 'MEDIUM',
     created_by      BIGINT REFERENCES users(user_id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -88,8 +93,10 @@ CREATE TABLE IF NOT EXISTS tests (
     description         TEXT,
     start_date          DATE,
     estimated_date      DATE,
+    due_date            DATE,
     complete_date       DATE,
     status              test_status NOT NULL DEFAULT 'NOT_STARTED',
+    priority            request_priority NOT NULL DEFAULT 'MEDIUM',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT tests_unique_per_request_control_track UNIQUE (request_id, control_id),
