@@ -90,6 +90,49 @@ class TestCrudUtils(TestCase):
 
         mock_logger.log.assert_called_once_with(level="ERROR", message="Error fetching record by ID", extra_fields={'error': 'DB down', 'table': 'controls', 'pk_column': 'vgcpid', 'pk_value': 'VGCP-001'})
 
+    # Get by Filter
+    @patch('utils.crud.DbUtils')
+    def test_get_by_filter_returns_matching_records(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection([
+            {"test_id": 1, "control_id": 20},
+            {"test_id": 2, "control_id": 20},
+        ])
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.get_by_filter("tests", "control_id", 20)
+
+        # Verify the SQL and the tuple parameter passed to it
+        mock_cursor.execute.assert_called_once_with(
+            "SELECT * FROM tests WHERE control_id = %s", (20,)
+        )
+        mock_conn.close.assert_called_once()
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["test_id"], 1)
+
+    @patch('utils.crud.DbUtils')
+    def test_get_by_filter_returns_empty_list_when_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection([])
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.get_by_filter("tests", "control_id", 999)
+
+        mock_conn.close.assert_called_once()
+        self.assertEqual(result, [])
+
+    @patch('utils.crud.Logger')
+    @patch('utils.crud.DbUtils')
+    def test_get_by_filter_raises_and_logs_on_error(self, mock_db, mock_logger):
+        mock_db.get_db_connection.side_effect = Exception("DB down")
+
+        with self.assertRaises(Exception):
+            CrudUtils.get_by_filter("tests", "control_id", 20)
+
+        mock_logger.log.assert_called_once_with(
+            level="ERROR", 
+            message="Error fetching records by filter", 
+            extra_fields={'error': 'DB down', 'table': 'tests', 'column': 'control_id', 'value': 20}
+        )
+
     # Create
 
     @patch('utils.crud.Logger')

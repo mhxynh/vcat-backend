@@ -113,9 +113,10 @@ INSERT INTO tests (
         requires_dat,
         requires_oet,
         assigned_tester_id,
-        status
+        estimated_date,
+        due_date,
     )
-VALUES (%s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
 RETURNING *;
 -- Update test progress (DAT track)
 UPDATE tests

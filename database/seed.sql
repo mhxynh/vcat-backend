@@ -46,7 +46,7 @@ SELECT
 FROM generate_series(1, :CONTROLS) AS s(i);
 
 -- 3. REQUESTS
-INSERT INTO requests (requestor, start_date, due_date, complete_date, status, created_by)
+INSERT INTO requests (requestor, start_date, due_date, complete_date, status, priority, created_by)
 SELECT
   format('Requester %s', ((i - 1) % 10) + 1),
   (current_date - ((i - 1) % 14))::date,
@@ -57,65 +57,70 @@ SELECT
     WHEN i % 2 = 0 THEN 'IN_PROGRESS'::request_status
     ELSE 'NOT_STARTED'::request_status
   END,
+  -- Generate a random priority
+  (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[FLOOR(RANDOM() * 4 + 1)],
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % :MANAGERS) LIMIT 1)
 FROM generate_series(1, :REQUESTS) AS s(i);
 
 -- 4. TESTS
+WITH test_data AS (
+  SELECT
+    -- Map Control N to a Request
+    ((s.i - 1) % :REQUESTS) + 1 AS request_id,
+    
+    s.i AS control_id,
+    
+    -- Assign Tester
+    (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1) AS assigned_tester_id,
+    
+    -- Requirements Logic
+    CASE WHEN (s.i % 10) != 1 THEN TRUE ELSE FALSE END AS requires_dat,
+    CASE WHEN (s.i % 10) != 0 THEN TRUE ELSE FALSE END AS requires_oet,
+    
+    -- Generate the Macro Status and Priority FIRST so we can base logic on them
+    (ARRAY['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED']::test_status[])[(s.i % 4) + 1] AS macro_status,
+    (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[(s.i % 4) + 1] AS priority
+  FROM generate_series(1, :CONTROLS) AS s(i)
+)
 INSERT INTO tests (
-  request_id, 
-  control_id, 
-  assigned_tester_id,
-  description, 
-  requires_dat,
-  requires_oet,
-  dat_step,
-  oet_step,
-  status,
-  start_date, 
-  estimated_date, 
-  complete_date
+  request_id, control_id, assigned_tester_id, description,
+  requires_dat, requires_oet, dat_step, oet_step, status, priority,
+  start_date, estimated_date, due_date, complete_date
 )
 SELECT
-  -- Map Control N to a Request
-  ((s.i - 1) % :REQUESTS) + 1 AS request_id,
+  request_id,
+  control_id,
+  assigned_tester_id,
+  format('Testing for Control %s', control_id),
+  requires_dat,
+  requires_oet,
   
-  s.i AS control_id,
-  
-  -- Assign Tester
-  (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1),
-  
-  format('Testing for Control %s', s.i),
-  
-  -- REQUIREMENTS LOGIC:
-  -- 80% have BOTH (Mod 10 NOT IN (0, 1))
-  -- 10% have DAT Only (Mod 10 = 0)
-  -- 10% have OET Only (Mod 10 = 1)
-  CASE WHEN (s.i % 10) != 1 THEN TRUE ELSE FALSE END AS requires_dat,
-  CASE WHEN (s.i % 10) != 0 THEN TRUE ELSE FALSE END AS requires_oet,
-
-  -- STEP GENERATION LOGIC (Must match requirements exactly):
-  -- If DAT is required (same logic as above), generate a random step.
+  -- DAT STEP LOGIC (Strictly respects Macro Status)
   CASE 
-     WHEN (s.i % 10) != 1 THEN 
-        (ARRAY['TESTING_READY', 'WALKTHROUGH_SCHEDULED', 'TESTING_IN_PROGRESS', 'COMPLETED', 'ADDRESSING_COMMENTS']::test_progress_step[])[FLOOR(RANDOM() * 5 + 1)]
-     ELSE NULL 
+    WHEN NOT requires_dat THEN NULL
+    WHEN macro_status = 'NOT_STARTED' THEN NULL
+    WHEN macro_status IN ('IN_REVIEW', 'COMPLETED') THEN 'COMPLETED'::test_progress_step
+    ELSE (ARRAY['TESTING_READY', 'WALKTHROUGH_SCHEDULED', 'TESTING_IN_PROGRESS', 'ADDRESSING_COMMENTS']::test_progress_step[])[(control_id % 4) + 1]
   END AS dat_step,
   
-  -- If OET is required (same logic as above), generate a random step.
+  -- OET STEP LOGIC (Strictly respects Macro Status)
   CASE 
-     WHEN (s.i % 10) != 0 THEN 
-        (ARRAY['TESTING_READY', 'TESTING_IN_PROGRESS', 'COMPLETED', 'ADDRESSING_COMMENTS']::test_progress_step[])[FLOOR(RANDOM() * 4 + 1)]
-     ELSE NULL 
+    WHEN NOT requires_oet THEN NULL
+    WHEN macro_status = 'NOT_STARTED' THEN NULL
+    WHEN macro_status IN ('IN_REVIEW', 'COMPLETED') THEN 'COMPLETED'::test_progress_step
+    ELSE (ARRAY['TESTING_READY', 'TESTING_IN_PROGRESS', 'ADDRESSING_COMMENTS']::test_progress_step[])[(control_id % 3) + 1]
   END AS oet_step,
 
-  -- Overall Test Status
-  (ARRAY['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED']::test_status[])[FLOOR(RANDOM() * 4 + 1)] AS status,
+  macro_status AS status,
+  priority,
 
-  -- Dates
-  current_date - 5,
-  current_date + 5,
-  NULL
-FROM generate_series(1, :CONTROLS) AS s(i);
+  -- DATE LOGIC (Strictly respects Macro Status)
+  CASE WHEN macro_status != 'NOT_STARTED' THEN current_date - 5 ELSE NULL END AS start_date,
+  current_date + 5 AS estimated_date,
+  current_date + 10 AS due_date,
+  CASE WHEN macro_status = 'COMPLETED' THEN current_date ELSE NULL END AS complete_date
+
+FROM test_data;
 
 -- 5. COMMENTS
 -- 1 request-level comment per request
