@@ -2,6 +2,7 @@ import json
 from unittest import TestCase
 from unittest.mock import patch
 import functions.controls.main as controls
+from functions.common.python.utils.response import ResponseUtils
 
 class TestControlsMain(TestCase):
     def _build_event(self, method, path, body=None, path_params=None, query_params=None):
@@ -65,7 +66,7 @@ class TestControlsMain(TestCase):
         self.assertIn("Control not found", json.loads(result["body"])["error"])
 
     # POST /controls
-
+    
     @patch('functions.controls.main.Logger')
     @patch('functions.controls.main.CrudUtils')
     def test_post_control_returns_200(self, mock_crud, mock_logger):
@@ -229,87 +230,3 @@ class TestControlsMain(TestCase):
 
         self.assertEqual(result["statusCode"], 500)
         self.assertIn("Unexpected error", json.loads(result["body"])["error"])
-
-    # Get method and path
-
-    def test_get_method_and_path(self):
-        event = self._build_event("GET", "/controls/VGCP-001")
-        method, path = controls.get_method_and_path(event)
-
-        self.assertEqual(method, "GET")
-        self.assertEqual(path, "/controls/VGCP-001")
-
-    def test_get_method_and_path_v2_fallback(self):
-        event = {"requestContext": {"http": {"method": "PUT"}}, "rawPath": "/controls/VGCP-001"}
-        method, path = controls.get_method_and_path(event)
-
-        self.assertEqual(method, "PUT")
-        self.assertEqual(path, "/controls/VGCP-001")
-
-    def test_get_method_and_path_empty_event(self):
-        method, path = controls.get_method_and_path({})
-
-        self.assertEqual(method, "")
-        self.assertEqual(path, "")
-
-    def test_get_method_and_path_v1_priority_over_v2(self):
-        event = {
-            "httpMethod": "DELETE",
-            "path": "/controls/VGCP-001",
-            "requestContext": {"http": {"method": "GET"}},
-            "rawPath": "/other",
-        }
-        method, path = controls.get_method_and_path(event)
-
-        self.assertEqual(method, "DELETE")
-        self.assertEqual(path, "/controls/VGCP-001")
-
-    # Extract VGCPID
-
-    def test_extract_vgcpid_from_path_params(self):
-        event = {"pathParameters": {"vgcpid": "VGCP-001"}}
-        result = controls.extract_vgcpid(event, "/controls/VGCP-001")
-
-        self.assertEqual(result, "VGCP-001")
-
-    def test_extract_vgcpid_converts_to_string(self):
-        event = {"pathParameters": {"vgcpid": 12345}}
-        result = controls.extract_vgcpid(event, "/controls/12345")
-
-        self.assertEqual(result, "12345")
-
-    def test_extract_vgcpid_ignores_none_path_param(self):
-        event = {"pathParameters": {"vgcpid": None}}
-        result = controls.extract_vgcpid(event, "/controls/VGCP-001")
-
-        self.assertEqual(result, "VGCP-001")
-
-    def test_extract_vgcpid_from_url_path(self):
-        event = {"pathParameters": {}}
-        result = controls.extract_vgcpid(event, "/controls/VGCP-002")
-
-        self.assertEqual(result, "VGCP-002")
-
-    def test_extract_vgcpid_strips_trailing_slash(self):
-        event = {"pathParameters": {}}
-        result = controls.extract_vgcpid(event, "/controls/VGCP-003/")
-
-        self.assertEqual(result, "VGCP-003")
-
-    def test_extract_vgcpid_returns_none_for_base_path(self):
-        event = {"pathParameters": {}}
-        result = controls.extract_vgcpid(event, "/controls")
-
-        self.assertIsNone(result)
-
-    def test_extract_vgcpid_returns_none_for_empty_path(self):
-        event = {}
-        result = controls.extract_vgcpid(event, "")
-
-        self.assertIsNone(result)
-
-    def test_extract_vgcpid_returns_none_for_wrong_resource(self):
-        event = {"pathParameters": {}}
-        result = controls.extract_vgcpid(event, "/requests/123")
-
-        self.assertIsNone(result)

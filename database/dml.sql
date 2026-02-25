@@ -75,6 +75,15 @@ UPDATE requests
 SET status = %s
 WHERE request_id = %s
 RETURNING *;
+-- Soft delete request by request_id
+UPDATE requests
+SET test_status = 'ARCHIVED'
+WHERE request_id = %s
+RETURNING *;
+-- Hard delete request by request_id
+DELETE FROM requests
+WHERE request_id = %s
+RETURNING *;
 ---------- TESTS QUERIES ----------
 -- Get tests by request_id
 SELECT *

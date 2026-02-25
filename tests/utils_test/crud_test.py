@@ -16,6 +16,7 @@ class TestCrudUtils(TestCase):
         return mock_conn, mock_cursor
 
     # Get All
+
     @patch('utils.crud.DbUtils')
     def test_get_all_returns_list(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection([
@@ -52,6 +53,7 @@ class TestCrudUtils(TestCase):
         mock_logger.log.assert_called_with(level="ERROR", message="Error fetching all records", extra_fields={"error": "DB down", "table": "controls"})
 
     # Get by ID
+
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
     def test_get_by_id_returns_record(self, mock_db, mock_logger):
@@ -89,6 +91,7 @@ class TestCrudUtils(TestCase):
         mock_logger.log.assert_called_once_with(level="ERROR", message="Error fetching record by ID", extra_fields={'error': 'DB down', 'table': 'controls', 'pk_column': 'vgcpid', 'pk_value': 'VGCP-001'})
 
     # Create
+
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
     def test_create_returns_created_record(self, mock_db, mock_logger):
@@ -119,6 +122,7 @@ class TestCrudUtils(TestCase):
         mock_logger.log.assert_called_with(level="ERROR", message="Error creating record", extra_fields={"error": "DB down", "table": "controls", "columns": ["vgcpid"]})
 
     # Update
+
     @patch('utils.crud.DbUtils')
     def test_update_returns_updated_record(self, mock_db):
         updated_row = {"control_id": 1, "vgcpid": "VGCP-001", "description": "Updated"}
@@ -157,6 +161,7 @@ class TestCrudUtils(TestCase):
         mock_logger.log.assert_called_once_with(level="ERROR", message="Error updating record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001", "updates": {"description": "X"}})
 
     # Deactivate (soft delete)
+
     @patch('utils.crud.DbUtils')
     def test_deactivate_success(self, mock_db):
         updated_row = {"control_id": 1, "vgcpid": "VGCP-001", "is_active": False}
@@ -181,6 +186,7 @@ class TestCrudUtils(TestCase):
         mock_logger.log.assert_called_once_with(level="ERROR", message="Error deactivating record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001"})
 
     # Hard Delete
+    
     @patch('utils.crud.DbUtils')
     def test_hard_delete_success(self, mock_db):
         deleted_row = {"control_id": 1, "vgcpid": "VGCP-001"}
