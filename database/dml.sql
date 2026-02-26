@@ -180,15 +180,15 @@ RETURNING *;
 ---------- TESTS QUERIES ----------
 -- Create test  
 INSERT INTO tests (
-        control_id,
-        request_id,
-        assigned_tester_id,
-        requires_dat,
-        requires_oet,
-        due_date,
-        estimated_date,
-        description
-    )
+    control_id,
+    request_id,
+    assigned_tester_id,
+    requires_dat,
+    requires_oet,
+    due_date,
+    estimated_date,
+    description
+)
 VALUES (
     (SELECT control_id FROM controls WHERE vgcpid = %s),
     %s, 

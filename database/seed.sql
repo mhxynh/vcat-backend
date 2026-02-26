@@ -46,9 +46,10 @@ SELECT
 FROM generate_series(1, :CONTROLS) AS s(i);
 
 -- 3. REQUESTS
-INSERT INTO requests (requestor, start_date, due_date, complete_date, status, priority, created_by)
+INSERT INTO requests (requestor, description, start_date, due_date, complete_date, status, priority, created_by)
 SELECT
   format('Requester %s', ((i - 1) % 10) + 1),
+  format('Annual audit testing requirements for Request %s.', i),
   (current_date - ((i - 1) % 14))::date,
   (current_date + ((i - 1) % 21) + 7)::date,
   CASE WHEN i % 5 = 0 THEN current_date::date ELSE NULL END,
