@@ -26,7 +26,7 @@ def lambda_handler(event, context):
 
         # GET /requests/{id} : get single request
         if method == Methods.GET:
-            req_id = ResponseUtils.extract_id(event, normalized_path, "requests")
+            req_id = ResponseUtils.extract_id(event, normalized_path, TableNames.REQUESTS)
 
             request_record = CrudUtils.get_by_id(TableNames.REQUESTS, "request_id", req_id)
             if not request_record:
@@ -60,7 +60,7 @@ def lambda_handler(event, context):
 
         # PUT /requests/{id} : update request (status transitions)
         if method == Methods.PUT:
-            req_id = ResponseUtils.extract_id(event, normalized_path, "requests")
+            req_id = ResponseUtils.extract_id(event, normalized_path, TableNames.REQUESTS)
             if req_id is None:
                 Logger.log(level=LogLevels.ERROR, message="Request ID not provided in path for update")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Request ID not provided"})
@@ -86,7 +86,7 @@ def lambda_handler(event, context):
 
         # DELETE /requests/{id} : Archive or Hard Delete a request
         if method == Methods.DELETE:
-            req_id = ResponseUtils.extract_id(event, normalized_path, "requests")
+            req_id = ResponseUtils.extract_id(event, normalized_path, TableNames.REQUESTS)
             if req_id is None:
                 Logger.log(level=LogLevels.ERROR, message="Request ID not provided in path for delete")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Request ID not provided"})

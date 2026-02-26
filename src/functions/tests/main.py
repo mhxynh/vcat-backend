@@ -1,24 +1,9 @@
 import json
-from constants.common_variables import LogLevels, Methods, StatusCodes
+from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
 from utils.crud import CrudUtils
 from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
-
-def get_method_and_path(event):
-    method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
-    path = event.get("path") or event.get("rawPath")
-    return (method or "").upper(), (path or "").rstrip("/")
-
-def extract_test_id(event, path):
-    path_params = event.get("pathParameters") or {}
-    if "test_id" in path_params and path_params["test_id"] is not None:
-        return str(path_params["test_id"])
-    
-    parts = path.strip("/").split("/")
-    if len(parts) >= 2 and parts[0] == "tests":
-        return parts[1]
-    return None
 
 def lambda_handler(event, context):
     Logger.start()
@@ -28,13 +13,13 @@ def lambda_handler(event, context):
         return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
 
     try:
-        method, normalized_path = get_method_and_path(event)
-        test_id = extract_test_id(event, normalized_path)
+        method, normalized_path = ResponseUtils.get_method_and_path(event)
+        test_id = ResponseUtils.extract_id(event, normalized_path, TableNames.TESTS)
     
         if method == Methods.GET:
             # GET /tests/{test_id}: Get a single test by test_id
             if test_id:
-                test_record = CrudUtils.get_by_id("tests", "test_id", test_id)
+                test_record = CrudUtils.get_by_id(TableNames.TESTS, "test_id", test_id)
                 if not test_record:
                     return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Test not found"})
                 return ResponseUtils.http_response(StatusCodes.OK, test_record)
@@ -48,9 +33,9 @@ def lambda_handler(event, context):
             if request_id and details:
                 records = TestRepository.get_tests_by_request_with_details(request_id)
             elif request_id:
-                records = CrudUtils.get_by_filter("tests", "request_id", request_id)
+                records = CrudUtils.get_by_filter(TableNames.TESTS, "request_id", request_id)
             elif control_id:
-                records = CrudUtils.get_by_filter("tests", "control_id", control_id)
+                records = CrudUtils.get_by_filter(TableNames.TESTS, "control_id", control_id)
             else:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Must provide request_id or control_id"})
                 
@@ -73,7 +58,7 @@ def lambda_handler(event, context):
                     columns.append(opt_field)
                     values.append(body[opt_field])
             
-            created = CrudUtils.create("tests", columns, values)
+            created = CrudUtils.create(TableNames.TESTS, columns, values)
             return ResponseUtils.http_response(StatusCodes.OK, created)
 
         # PUT /tests/{test_id} : Update a test by test_id
@@ -100,7 +85,7 @@ def lambda_handler(event, context):
                 allowed_fields = ["assigned_tester_id", "status", "dat_step", "oet_step"]
                 updates = {field: value for field, value in body.items() if field in allowed_fields}
                 if updates:
-                    updated_record = CrudUtils.update("tests", "test_id", test_id, updates)
+                    updated_record = CrudUtils.update(TableNames.TESTS, "test_id", test_id, updates)
 
             if not updated_record:
                 return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Test not found or invalid action provided"})
@@ -112,7 +97,7 @@ def lambda_handler(event, context):
             if not test_id:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Test ID required for deletion"})
             
-            deleted = CrudUtils.hard_delete("tests", "test_id", test_id)
+            deleted = CrudUtils.hard_delete(TableNames.TESTS, "test_id", test_id)
             if not deleted:
                 return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Test not found"})
             

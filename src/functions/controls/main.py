@@ -26,7 +26,7 @@ def lambda_handler(event, context):
 
         # GET /controls/{vgcpid} : Get a single control by vgcpid
         if method == Methods.GET:
-            vgcpid = ResponseUtils.extract_id(event, normalized_path, "controls")
+            vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             
             control = CrudUtils.get_by_id(TableNames.CONTROLS, "vgcpid", vgcpid)
             if not control:
@@ -62,7 +62,7 @@ def lambda_handler(event, context):
 
         # PUT /controls/{vgcpid} : Update an existing control by vgcpid
         if method == Methods.PUT:
-            vgcpid = ResponseUtils.extract_id(event, normalized_path, "controls")
+            vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             if vgcpid is None:
                 Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "VGCPID not provided"})
@@ -89,7 +89,7 @@ def lambda_handler(event, context):
         
         # DELETE /controls/{vgcpid} : Retire or Hard Delete a control by vgcpid
         if method == Methods.DELETE:
-            vgcpid = ResponseUtils.extract_id(event, normalized_path, "controls")
+            vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             if vgcpid is None:
                 Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path for delete")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "VGCPID not provided"})
