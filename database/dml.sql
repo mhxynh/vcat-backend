@@ -280,6 +280,17 @@ SET status = 'COMPLETED',
 WHERE test_id = %s
 RETURNING *;
 
+-- Soft delete test by test_id
+UPDATE tests
+SET status = 'ARCHIVED'
+WHERE test_id = %s
+RETURNING *;
+
+-- Hard delete test by test_id
+DELETE FROM tests
+WHERE test_id = %s
+RETURNING *;
+
 ---------- COMMENTS QUERIES ----------
 -- Get comments by test_id
 SELECT *
