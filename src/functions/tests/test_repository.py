@@ -3,7 +3,7 @@ from utils.logger import Logger
 
 class TestRepository:
     @staticmethod
-    def get_all():
+    def get_all_tests():
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -23,7 +23,7 @@ class TestRepository:
             raise e
     
     @staticmethod
-    def get_by_id(test_id):
+    def get_tests_by_id(test_id):
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -44,7 +44,7 @@ class TestRepository:
             raise e
 
     @staticmethod
-    def get_by_request_id(request_id):
+    def get_tests_by_request_id(request_id):
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -65,7 +65,7 @@ class TestRepository:
             raise e
 
     @staticmethod
-    def get_by_request_with_details(request_id):
+    def get_tests_by_request_with_details(request_id):
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -87,7 +87,7 @@ class TestRepository:
             raise e
 
     @staticmethod
-    def get_by_control_id(control_id):
+    def get_tests_by_control_id(control_id):
         try:
             conn = DbUtils.get_db_connection()
             try:

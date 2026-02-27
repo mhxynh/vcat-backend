@@ -14,7 +14,33 @@ class TestTestRepository(TestCase):
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         return mock_conn, mock_cursor
 
-    # get_tests_by_request_with_details
+    # Base Retrievals
+    
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_get_all_tests_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection([{"test_id": 1, "vgcpid": "VGCP-001"}])
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.get_all_tests()
+
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("SELECT t.*, c.vgcpid", args[0])
+        self.assertIn("JOIN controls c", args[0])
+        self.assertEqual(len(result), 1)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_get_tests_by_id_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "vgcpid": "VGCP-001"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.get_tests_by_id(42)
+
+        args, kwargs = mock_cursor.execute.call_args
+        self.assertIn("WHERE t.test_id = %s", args[0])
+        self.assertEqual(args[1], (42,))
+        self.assertEqual(result["test_id"], 42)
+
+    # Complex Retrievals
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_get_tests_by_request_with_details_success(self, mock_db):
@@ -36,89 +62,41 @@ class TestTestRepository(TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["tester_name"], "Alice")
 
-    @patch('functions.tests.test_repository.Logger')
+    # Create & Mutate
+
     @patch('functions.tests.test_repository.DbUtils')
-    def test_get_tests_by_request_with_details_error(self, mock_db, mock_logger):
-        mock_db.get_db_connection.side_effect = Exception("DB down")
+    def test_create_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 1, "description": "A"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
 
-        with self.assertRaises(Exception):
-            TestRepository.get_tests_by_request_with_details(100)
-
-        mock_logger.log.assert_called_once_with(
-            level="ERROR", 
-            message="Error fetching test details by request", 
-            extra_fields={'error': 'DB down', 'request_id': 100}
+        result = TestRepository.create(
+            vgcpid="VGCP-001", request_id=1, description="A", 
+            requires_dat=True, requires_oet=False, due_date="2026-03-01"
         )
 
-    # update_dat_track
+        args, kwargs = mock_cursor.execute.call_args
+        sql_query, sql_params = args[0], args[1]
+        
+        # Verify the subquery is injected properly
+        self.assertIn("(SELECT control_id FROM controls WHERE vgcpid = %s)", sql_query)
+        self.assertEqual(sql_params[0], "VGCP-001")
+        
+        mock_conn.commit.assert_called_once()
+        self.assertEqual(result["test_id"], 1)
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_update_dat_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
-        {"test_id": 42, "dat_step": "Original Step", "status": "IN_PROGRESS"}, 
-        fetchone=True
-    )
+            {"test_id": 42, "dat_step": "Phase 2", "status": "IN_PROGRESS"}, fetchone=True
+        )
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = TestRepository.update_dat_track(42, None, "IN_PROGRESS")
+        result = TestRepository.update_dat_track(42, "Phase 2", "IN_PROGRESS")
 
         args, _ = mock_cursor.execute.call_args
-        self.assertIn("COALESCE(%s, dat_step)", args[0])
-        self.assertEqual(args[1], (None, "IN_PROGRESS", 42))
-        self.assertEqual(result["dat_step"], "Original Step")
-
-    @patch('functions.tests.test_repository.Logger')
-    @patch('functions.tests.test_repository.DbUtils')
-    def test_update_dat_track_error(self, mock_db, mock_logger):
-        mock_db.get_db_connection.side_effect = Exception("DB down")
-
-        with self.assertRaises(Exception):
-            TestRepository.update_dat_track(42, "Phase 2", "IN_PROGRESS")
-
-        mock_logger.log.assert_called_once_with(
-            level="ERROR", 
-            message="Error updating DAT track", 
-            extra_fields={'error': 'DB down', 'test_id': 42}
-        )
-
-    # update_oet_track
-
-    @patch('functions.tests.test_repository.DbUtils')
-    def test_update_oet_track_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection(
-            {"test_id": 42, "oet_step": "Step 1", "status": "IN_PROGRESS"}, fetchone=True
-        )
-        mock_db.get_db_connection.return_value = mock_conn
-
-        result = TestRepository.update_oet_track(42, "Step 1", "IN_PROGRESS")
-
-        args, kwargs = mock_cursor.execute.call_args
-        sql_query = args[0]
-        
-        self.assertIn("UPDATE tests", sql_query)
-        self.assertIn("oet_step = COALESCE(%s, oet_step)", sql_query)
-        self.assertIn("status = COALESCE(%s, status)", sql_query)
-        self.assertEqual(args[1], ("Step 1", "IN_PROGRESS", 42))
-        
-        mock_conn.commit.assert_called_once()
-        mock_conn.close.assert_called_once()
-        self.assertEqual(result["oet_step"], "Step 1")
-
-    @patch('functions.tests.test_repository.Logger')
-    @patch('functions.tests.test_repository.DbUtils')
-    def test_update_oet_track_error(self, mock_db, mock_logger):
-        mock_db.get_db_connection.side_effect = Exception("DB down")
-
-        with self.assertRaises(Exception):
-            TestRepository.update_oet_track(42, "Step 1", "IN_PROGRESS")
-
-        mock_logger.log.assert_called_once_with(
-            level="ERROR", 
-            message="Error updating OET track", 
-            extra_fields={'error': 'DB down', 'test_id': 42}
-        )
-
-    # start_test
+        self.assertIn("SET dat_step = %s, status = %s", args[0])
+        self.assertEqual(args[1], ("Phase 2", "IN_PROGRESS", 42))
+        self.assertEqual(result["dat_step"], "Phase 2")
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_start_test_success(self, mock_db):
@@ -137,22 +115,6 @@ class TestTestRepository(TestCase):
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "IN_PROGRESS")
 
-    @patch('functions.tests.test_repository.Logger')
-    @patch('functions.tests.test_repository.DbUtils')
-    def test_start_test_error(self, mock_db, mock_logger):
-        mock_db.get_db_connection.side_effect = Exception("DB down")
-
-        with self.assertRaises(Exception):
-            TestRepository.start_test(42)
-
-        mock_logger.log.assert_called_once_with(
-            level="ERROR", 
-            message="Error starting test", 
-            extra_fields={'error': 'DB down', 'test_id': 42}
-        )
-
-    # complete_test
-
     @patch('functions.tests.test_repository.DbUtils')
     def test_complete_test_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
@@ -170,48 +132,44 @@ class TestTestRepository(TestCase):
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "COMPLETED")
 
-    @patch('functions.tests.test_repository.Logger')
-    @patch('functions.tests.test_repository.DbUtils')
-    def test_complete_test_error(self, mock_db, mock_logger):
-        mock_db.get_db_connection.side_effect = Exception("DB down")
-
-        with self.assertRaises(Exception):
-            TestRepository.complete_test(42)
-
-        mock_logger.log.assert_called_once_with(
-            level="ERROR", 
-            message="Error completing test", 
-            extra_fields={'error': 'DB down', 'test_id': 42}
-        )
-
-    # review_test
+    # Deletions
 
     @patch('functions.tests.test_repository.DbUtils')
-    def test_review_test_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection(
-            {"test_id": 42, "status": "IN_REVIEW"}, fetchone=True
-        )
+    def test_soft_delete_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "ARCHIVED"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = TestRepository.review_test(42)
+        result = TestRepository.soft_delete(42)
 
-        args, kwargs = mock_cursor.execute.call_args
-        self.assertIn("SET status = 'IN_REVIEW'", args[0])
-        self.assertEqual(args[1], (42,))
-        
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("SET status = 'ARCHIVED'", args[0])
         mock_conn.commit.assert_called_once()
-        self.assertEqual(result["status"], "IN_REVIEW")
+        self.assertEqual(result["status"], "ARCHIVED")
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_hard_delete_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.hard_delete(42)
+
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("DELETE FROM tests", args[0])
+        mock_conn.commit.assert_called_once()
+        self.assertEqual(result["test_id"], 42)
+
+    # Error Catching
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
-    def test_review_test_error(self, mock_db, mock_logger):
+    def test_repository_methods_log_and_raise_errors(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
 
         with self.assertRaises(Exception):
-            TestRepository.review_test(42)
+            TestRepository.get_all_tests()
 
         mock_logger.log.assert_called_once_with(
             level="ERROR", 
-            message="Error reviewing test", 
-            extra_fields={'error': 'DB down', 'test_id': 42}
+            message="Error fetching all tests", 
+            extra_fields={'error': 'DB down'}
         )

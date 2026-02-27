@@ -1,6 +1,5 @@
 import json
 from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
-from utils.crud import CrudUtils
 from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
@@ -19,7 +18,7 @@ def lambda_handler(event, context):
         if method == Methods.GET:
             # GET /tests/{test_id}
             if test_id:
-                test_record = TestRepository.get_by_id(test_id)
+                test_record = TestRepository.get_tests_by_id(test_id)
                 if not test_record:
                     return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Test not found"})
                 return ResponseUtils.http_response(StatusCodes.OK, test_record)
@@ -31,16 +30,16 @@ def lambda_handler(event, context):
 
             # GET /tests?request_id=X&details=true
             if request_id and details:
-                records = TestRepository.get_by_request_with_details(request_id)
+                records = TestRepository.get_tests_by_request_with_details(request_id)
             # GET /tests?request_id=X
             elif request_id:
-                records = TestRepository.get_by_request_id(request_id)
+                records = TestRepository.get_tests_by_request_id(request_id)
             # GET /tests?control_id=X
             elif control_id:
-                records = TestRepository.get_by_control_id(control_id)
+                records = TestRepository.get_tests_by_control_id(control_id)
             # GET /tests (All)
             else:
-                records = TestRepository.get_all()
+                records = TestRepository.get_all_tests()
                 
             return ResponseUtils.http_response(StatusCodes.OK, records)
 
@@ -49,7 +48,7 @@ def lambda_handler(event, context):
             required = ["vgcpid", "request_id", "requires_dat", "requires_oet", "due_date", "description"]
             
             missing = [k for k in required if k not in body]
-            if not all(k in body for k in required):
+            if missing:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": f"Missing required fields: {missing}"})
             
             created = TestRepository.create(
@@ -64,7 +63,7 @@ def lambda_handler(event, context):
             )
 
             if not created:
-                return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": "Failed to create test. Verify that VGCPID exists."})
+                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Failed to create test. Verify that VGCPID exists."})
             
             return ResponseUtils.http_response(StatusCodes.OK, created)
 
@@ -117,8 +116,16 @@ def lambda_handler(event, context):
 
     except Exception as e:
         error_message = str(e)
+        # Catch missing vgcpid (Subquery returns NULL)
+        if "violates not-null constraint" in error_message and "control_id" in error_message:
+             Logger.log(level=LogLevels.WARNING, message="Invalid vgcpid provided", extra_fields={"exception": error_message})
+             return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "The provided vgcpid does not exist in the controls table."})
+             
+        # Catch bad request_id or assigned_tester_id
         if "violates foreign key constraint" in error_message:
-            Logger.log(level=LogLevels.WARNING, message="Foreign key violation", extra_fields={"exception": error_message})
-            return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Invalid referenced ID (e.g., request_id or assigned_tester_id) provided."})
+             Logger.log(level=LogLevels.WARNING, message="Foreign key violation", extra_fields={"exception": error_message})
+             return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Invalid referenced ID (e.g., request_id or assigned_tester_id) provided."})
+             
+        # Default Fallback
         Logger.log(level=LogLevels.ERROR, message="Error in tests handler", extra_fields={"exception": error_message})
         return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": error_message})
