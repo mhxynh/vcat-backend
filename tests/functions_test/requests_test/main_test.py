@@ -70,7 +70,7 @@ class TestRequestsMain(TestCase):
 	@patch('functions.requests.main.Logger')
 	@patch('functions.requests.main.CrudUtils')
 	def test_post_request_returns_200(self, mock_crud, mock_logger):
-		new_req = {"requestor": "alice@example.com", "created_by": 1, "due_date": "2026-03-01"}
+		new_req = {"requestor": "random", "created_by": 1, "due_date": "2026-03-01", "priority": "HIGH"}
 		mock_crud.create.return_value = {**new_req, "request_id": 10}
 
 		event = self._build_event("POST", "/requests", body=new_req)
@@ -88,7 +88,7 @@ class TestRequestsMain(TestCase):
 		result = requests.lambda_handler(event, None)
 
 		mock_crud.create.assert_not_called()
-		mock_logger.log.assert_any_call(level="ERROR", message="Missing fields in request body", extra_fields={"missing": ['created_by']})
+		mock_logger.log.assert_any_call(level="ERROR", message="Missing fields in request body", extra_fields={"missing": ['due_date', 'priority', 'created_by']})
 		self.assertEqual(result["statusCode"], 400)
 		self.assertIn("missing", json.loads(result["body"]))
 
@@ -97,21 +97,21 @@ class TestRequestsMain(TestCase):
 	@patch('functions.requests.main.Logger')
 	@patch('functions.requests.main.CrudUtils')
 	def test_put_request_updates_status_returns_200(self, mock_crud, mock_logger):
-		mock_crud.update.return_value = {"request_id": 42, "status": "IN_PROGRESS"}
+		mock_crud.update.return_value = {"request_id": 42, "priority": "HIGH"}
 
-		event = self._build_event("PUT", "/requests/42", body={"status": "IN_PROGRESS"}, path_params={"id": "42"})
+		event = self._build_event("PUT", "/requests/42", body={"priority": "HIGH"}, path_params={"id": "42"})
 		result = requests.lambda_handler(event, None)
 
-		mock_logger.log.assert_any_call(level="INFO", message="Updated request", extra_fields={"request_id": '42', "updates": {'status': 'IN_PROGRESS'}})
+		mock_logger.log.assert_any_call(level="INFO", message="Updated request", extra_fields={"request_id": '42', "updates": {'priority': 'HIGH'}})
 		self.assertEqual(result["statusCode"], 200)
-		self.assertEqual(json.loads(result["body"])["status"], "IN_PROGRESS")
+		self.assertEqual(json.loads(result["body"])["priority"], "HIGH")
 
 	@patch('functions.requests.main.Logger')
 	@patch('functions.requests.main.CrudUtils')
 	def test_put_request_not_found_returns_404(self, mock_crud, mock_logger):
 		mock_crud.update.return_value = None
 
-		event = self._build_event("PUT", "/requests/999", body={"status": "COMPLETED"}, path_params={"id": "999"})
+		event = self._build_event("PUT", "/requests/999", body={"priority": "HIGH"}, path_params={"id": "999"})
 		result = requests.lambda_handler(event, None)
 
 		mock_logger.log.assert_any_call(level="WARNING", message="Request not found for update", extra_fields={"request_id": '999'})
@@ -132,7 +132,7 @@ class TestRequestsMain(TestCase):
 		event = self._build_event("PUT", "/requests/42", body={"bad": "x"}, path_params={"id": "42"})
 		result = requests.lambda_handler(event, None)
 
-		mock_logger.log.assert_any_call(level="ERROR", message="No valid fields to update; only 'status' allowed")
+		mock_logger.log.assert_any_call(level="ERROR", message="No valid fields to update")
 		self.assertEqual(result["statusCode"], 400)
 		self.assertIn("allowed", json.loads(result["body"]))
 
@@ -230,4 +230,3 @@ class TestRequestsMain(TestCase):
 
 		self.assertEqual(result["statusCode"], 500)
 		self.assertIn("Unexpected error", json.loads(result["body"])["error"])
-

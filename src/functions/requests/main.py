@@ -36,21 +36,21 @@ def lambda_handler(event, context):
             Logger.log(level=LogLevels.INFO, message="Returning request", extra_fields={"request_id": req_id})
             return ResponseUtils.http_response(StatusCodes.OK, request_record)
 
-        # POST /requests : create a new request
+        # POST /requests : create a new request (DML: priority, requestor, due_date, description, created_by)
         if method == Methods.POST:
             body = json.loads(event.get("body", "{}"))
-            required_fields = ["requestor", "created_by"]
+            required_fields = ["requestor", "due_date", "priority", "created_by"]
             missing = [field for field in required_fields if field not in body]
             if missing:
                 Logger.log(level=LogLevels.ERROR, message="Missing fields in request body", extra_fields={"missing": missing})
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Missing required fields", "missing": missing})
 
-            columns = ["requestor", "start_date", "due_date", "status", "created_by"]
+            columns = ["priority", "requestor", "due_date", "description", "created_by"]
             values = [
+                body.get("priority"),
                 body.get("requestor"),
-                body.get("start_date"),
                 body.get("due_date"),
-                body.get("status", "Not Started"),
+                body.get("description"),
                 body.get("created_by"),
             ]
             created = CrudUtils.create(TableNames.REQUESTS, columns, values)
@@ -58,7 +58,7 @@ def lambda_handler(event, context):
             Logger.log(level=LogLevels.INFO, message="Created request", extra_fields={"request_id": created.get("request_id")})
             return ResponseUtils.http_response(StatusCodes.OK, created)
 
-        # PUT /requests/{id} : update request (status transitions)
+        # PUT /requests/{id} : update request
         if method == Methods.PUT:
             req_id = ResponseUtils.extract_id(event, normalized_path, TableNames.REQUESTS)
             if req_id is None:
@@ -70,11 +70,11 @@ def lambda_handler(event, context):
                 Logger.log(level=LogLevels.ERROR, message="No update data provided")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No update data provided"})
 
-            allowed_fields = ["status"]
+            allowed_fields = ["priority", "requestor", "due_date", "description"]
             updates = {k: v for k, v in body.items() if k in allowed_fields}
             if not updates:
-                Logger.log(level=LogLevels.ERROR, message="No valid fields to update; only 'status' allowed")
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No valid fields to update; only 'status' allowed", "allowed": allowed_fields})
+                Logger.log(level=LogLevels.ERROR, message="No valid fields to update")
+                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No valid fields to update", "allowed": allowed_fields})
 
             updated = CrudUtils.update(TableNames.REQUESTS, "request_id", req_id, updates)
             if not updated:
