@@ -1,5 +1,4 @@
 import json
-from unittest.mock import patch
 
 from utils.db_utils import DbUtils
 from utils.logger import Logger
@@ -301,45 +300,3 @@ class TestRepository:
         except Exception as e:
             Logger.log(level="ERROR", message="Error hard deleting test", extra_fields={"error": str(e), "test_id": test_id})
             raise e
-
-    def test_get_method_and_path_v2_format(self):
-        event = {
-            "requestContext": {"http": {"method": "PATCH"}},
-            "rawPath": "/tests/99/"
-        }
-        method, path = tests_main.get_method_and_path(event)
-        self.assertEqual(method, "PATCH")
-        self.assertEqual(path, "/tests/99")
-
-    def test_extract_test_id_fallback_to_path_split(self):
-        event = {"pathParameters": None}
-        test_id = tests_main.extract_test_id(event, "/tests/123")
-        self.assertEqual(test_id, "123")
-        
-        test_id_none = tests_main.extract_test_id(event, "/tests")
-        self.assertIsNone(test_id_none)
-
-    @patch('functions.tests.main.TestRepository')
-    def test_get_with_none_query_params(self, mock_repo):
-        mock_repo.get_all.return_value = []
-        event = self._build_event("GET", "/tests")
-        event["queryStringParameters"] = None 
-        
-        result = tests_main.lambda_handler(event, None)
-        self.assertEqual(result["statusCode"], 200)
-
-    def test_post_with_missing_body_key(self):
-        event = self._build_event("POST", "/tests")
-        event.pop("body", None) 
-        
-        result = tests_main.lambda_handler(event, None)
-        self.assertEqual(result["statusCode"], 400)
-        self.assertIn("Missing required fields", json.loads(result["body"])["error"])
-
-    def test_put_with_missing_body_key(self):
-        event = self._build_event("PUT", "/tests/42", path_params={"test_id": "42"})
-        event.pop("body", None)
-        
-        result = tests_main.lambda_handler(event, None)
-        self.assertEqual(result["statusCode"], 400)
-        self.assertIn("Invalid or missing action", json.loads(result["body"])["error"])

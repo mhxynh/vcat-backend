@@ -173,3 +173,4 @@ class TestTestRepository(TestCase):
             message="Error fetching all tests", 
             extra_fields={'error': 'DB down'}
         )
+    

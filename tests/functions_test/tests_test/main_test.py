@@ -232,3 +232,27 @@ class TestTestsMain(TestCase):
         
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("Invalid referenced ID", json.loads(result["body"])["error"])
+
+    def test_get_with_none_query_params(self, mock_repo):
+        mock_repo.get_all.return_value = []
+        event = self._build_event("GET", "/tests")
+        event["queryStringParameters"] = None 
+        
+        result = tests_main.lambda_handler(event, None)
+        self.assertEqual(result["statusCode"], 200, result["body"])
+
+    def test_post_with_missing_body_key(self):
+        event = self._build_event("POST", "/tests")
+        event.pop("body", None) 
+        
+        result = tests_main.lambda_handler(event, None)
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("Missing required fields", json.loads(result["body"])["error"])
+
+    def test_put_with_missing_body_key(self):
+        event = self._build_event("PUT", "/tests/42", path_params={"test_id": "42"})
+        event.pop("body", None)
+        
+        result = tests_main.lambda_handler(event, None)
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("Invalid or missing action", json.loads(result["body"])["error"])
