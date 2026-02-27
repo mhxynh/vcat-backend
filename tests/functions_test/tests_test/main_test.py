@@ -136,6 +136,50 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["status"], "IN_PROGRESS")
 
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_dat_returns_200(self, mock_repo):
+        mock_repo.update_dat_track.return_value = {"test_id": "42", "status": "IN_PROGRESS"}
+        event = self._build_event("PUT", "/tests/42", body={"action": "update_dat", "dat_step": "Step 1", "status": "IN_PROGRESS"})
+        event["pathParameters"] = {"test_id": "42", "id": "42"}
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 200)
+        mock_repo.update_dat_track.assert_called_once()
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_oet_returns_200(self, mock_repo):
+        mock_repo.update_oet_track.return_value = {"test_id": "42", "status": "IN_PROGRESS"}
+        event = self._build_event("PUT", "/tests/42", body={"action": "update_oet", "oet_step": "Step 1", "status": "IN_PROGRESS"})
+        event["pathParameters"] = {"test_id": "42", "id": "42"}
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 200)
+        mock_repo.update_oet_track.assert_called_once()
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_review_returns_200(self, mock_repo):
+        mock_repo.review_test.return_value = {"test_id": "42", "status": "IN_REVIEW"}
+        event = self._build_event("PUT", "/tests/42", body={"action": "review"})
+        event["pathParameters"] = {"test_id": "42", "id": "42"}
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 200)
+        mock_repo.review_test.assert_called_once()
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_complete_returns_200(self, mock_repo):
+        mock_repo.complete_test.return_value = {"test_id": "42", "status": "COMPLETED"}
+        event = self._build_event("PUT", "/tests/42", body={"action": "complete"})
+        event["pathParameters"] = {"test_id": "42", "id": "42"}
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 200)
+        mock_repo.complete_test.assert_called_once()
+
     def test_put_test_invalid_action_returns_400(self):
         event = self._build_event("PUT", "/tests/42", body={"action": "garbage_action"}, path_params={"test_id": "42"})
         result = tests_main.lambda_handler(event, None)
@@ -170,6 +214,19 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 200)
 
     @patch('functions.tests.main.TestRepository')
+    def test_delete_test_not_found_returns_404(self, mock_repo):
+        mock_repo.soft_delete.return_value = None
+        event = self._build_event("DELETE", "/tests/99", path_params={"test_id": "99"})
+        
+        result = tests_main.lambda_handler(event, None)
+        self.assertEqual(result["statusCode"], 404)
+
+    def test_delete_missing_test_id_returns_400(self):
+        event = self._build_event("DELETE", "/tests", path_params={})
+        result = tests_main.lambda_handler(event, None)
+        self.assertEqual(result["statusCode"], 400)
+
+    @patch('functions.tests.main.TestRepository')
     def test_delete_test_hard_delete_returns_200(self, mock_repo):
         mock_repo.hard_delete.return_value = {"test_id": "42"}
         event = self._build_event("DELETE", "/tests/42", path_params={"test_id": "42"}, query_params={"hard": "true"})
@@ -179,17 +236,14 @@ class TestTestsMain(TestCase):
         mock_repo.hard_delete.assert_called_once_with("42")
         self.assertEqual(result["statusCode"], 200)
 
-    def test_delete_missing_test_id_returns_400(self):
-        event = self._build_event("DELETE", "/tests", path_params={})
-        result = tests_main.lambda_handler(event, None)
-        self.assertEqual(result["statusCode"], 400)
-
     @patch('functions.tests.main.TestRepository')
-    def test_delete_test_not_found_returns_404(self, mock_repo):
-        mock_repo.soft_delete.return_value = None
-        event = self._build_event("DELETE", "/tests/99", path_params={"test_id": "99"})
+    def test_delete_hard_delete_not_found_returns_404(self, mock_repo):
+        mock_repo.hard_delete.return_value = None
+        event = self._build_event("DELETE", "/tests/42", query_params={"hard": "true"})
+        event["pathParameters"] = {"test_id": "42", "id": "42"}
         
         result = tests_main.lambda_handler(event, None)
+        
         self.assertEqual(result["statusCode"], 404)
 
     def test_unsupported_method_returns_405(self):
@@ -213,6 +267,21 @@ class TestTestsMain(TestCase):
 
     @patch('functions.tests.main.Logger')
     @patch('functions.tests.main.TestRepository')
+    def test_exception_not_null_but_not_control_id(self, mock_repo, mock_logger):
+        # Triggers the 'if "violates not-null constraint"' but misses the '"control_id" in error_message' side of the AND
+        mock_repo.create.side_effect = Exception("violates not-null constraint on column some_other_column")
+        event = self._build_event("POST", "/tests", body={
+            "vgcpid": "B", "request_id": 1, "requires_dat": True, 
+            "requires_oet": False, "due_date": "2026", "description": "C"
+        })
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        # Since it misses the first IF block, it must drop safely to the 500 error
+        self.assertEqual(result["statusCode"], 500)
+
+    @patch('functions.tests.main.Logger')
+    @patch('functions.tests.main.TestRepository')
     def test_exception_not_null_returns_400(self, mock_repo, mock_logger):
         mock_repo.create.side_effect = Exception("violates not-null constraint on column control_id")
         event = self._build_event("POST", "/tests", body={"vgcpid": "B", "request_id": 1, "requires_dat": True, "requires_oet": False, "due_date": "2026", "description": "C"})
@@ -233,13 +302,14 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("Invalid referenced ID", json.loads(result["body"])["error"])
 
+    @patch('functions.tests.main.TestRepository')
     def test_get_with_none_query_params(self, mock_repo):
-        mock_repo.get_all.return_value = []
+        mock_repo.get_all_tests.return_value = []
         event = self._build_event("GET", "/tests")
         event["queryStringParameters"] = None 
         
         result = tests_main.lambda_handler(event, None)
-        self.assertEqual(result["statusCode"], 200, result["body"])
+        self.assertEqual(result["statusCode"], 200)
 
     def test_post_with_missing_body_key(self):
         event = self._build_event("POST", "/tests")
