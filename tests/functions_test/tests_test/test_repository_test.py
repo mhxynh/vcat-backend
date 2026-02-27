@@ -18,14 +18,19 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_get_all_tests_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection([{"test_id": 1, "vgcpid": "VGCP-001"}])
+        mock_conn, mock_cursor = self._mock_connection([{
+            "test_id": 1, 
+            "vgcpid": "VGCP-001", 
+            "assigned_tester_name": "Bob Vance"
+        }])
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.get_all_tests()
 
         args, _ = mock_cursor.execute.call_args
-        self.assertIn("SELECT t.*, c.vgcpid", args[0])
+        self.assertIn("LEFT JOIN users u", args[0])
         self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["assigned_tester_name"], "Bob Vance")
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -37,7 +42,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_get_tests_by_id_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "vgcpid": "VGCP-001"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "vgcpid": "VGCP-001", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.get_tests_by_id(42)
@@ -46,6 +51,7 @@ class TestTestRepository(TestCase):
         self.assertIn("WHERE t.test_id = %s", args[0])
         self.assertEqual(args[1], (42,))
         self.assertEqual(result["test_id"], 42)
+        self.assertEqual(result["assigned_tester_name"], "Alice")
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -57,7 +63,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_get_tests_by_request_id_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection([{"test_id": 1, "request_id": 100}])
+        mock_conn, mock_cursor = self._mock_connection([{"test_id": 1, "request_id": 100, "vgcpid": "VGCP-001", "assigned_tester_name": "Alice"}])
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.get_tests_by_request_id(100)
@@ -102,7 +108,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_get_tests_by_control_id_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection([{"test_id": 1, "control_id": 20}])
+        mock_conn, mock_cursor = self._mock_connection([{"test_id": 1, "control_id": 20, "vgcpid": "VGCP-001", "assigned_tester_name": "Alice"}])
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.get_tests_by_control_id(20)
@@ -123,7 +129,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_create_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 1, "description": "Desc"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 1, "description": "Desc", "vgcpid": "VGCP-001", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.create(
@@ -138,7 +144,7 @@ class TestTestRepository(TestCase):
         self.assertEqual(sql_params[0], "VGCP-001")
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["test_id"], 1)
-
+        self.assertEqual(result["assigned_tester_name"], "Alice")   
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
     def test_create_error(self, mock_db, mock_logger):
@@ -173,7 +179,7 @@ class TestTestRepository(TestCase):
     @patch('functions.tests.test_repository.DbUtils')
     def test_update_oet_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
-            {"test_id": 42, "oet_step": "Step 1", "status": "IN_PROGRESS"}, fetchone=True
+            {"test_id": 42, "oet_step": "Step 1", "status": "IN_PROGRESS", "assigned_tester_name": "Alice"}, fetchone=True
         )
         mock_db.get_db_connection.return_value = mock_conn
 
@@ -195,7 +201,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_start_test_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "IN_PROGRESS"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "IN_PROGRESS", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.start_test(42)
@@ -216,7 +222,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_review_test_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "IN_REVIEW"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "IN_REVIEW", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.review_test(42)
@@ -237,7 +243,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_complete_test_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "COMPLETED"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "COMPLETED", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.complete_test(42)
@@ -260,7 +266,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_soft_delete_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "ARCHIVED"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "ARCHIVED", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.soft_delete(42)
@@ -269,6 +275,7 @@ class TestTestRepository(TestCase):
         self.assertIn("SET status = 'ARCHIVED'", args[0])
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "ARCHIVED")
+        self.assertEqual(result["assigned_tester_name"], "Alice")
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -280,7 +287,7 @@ class TestTestRepository(TestCase):
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_hard_delete_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.hard_delete(42)
@@ -289,7 +296,8 @@ class TestTestRepository(TestCase):
         self.assertIn("DELETE FROM tests", args[0])
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["test_id"], 42)
-
+        self.assertEqual(result["assigned_tester_name"], "Alice")
+    
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
     def test_hard_delete_error(self, mock_db, mock_logger):

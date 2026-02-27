@@ -11,9 +11,13 @@ class TestRepository:
             try:
                 with conn.cursor() as cur:
                     query = """
-                        SELECT t.*, c.vgcpid
+                        SELECT
+                            t.*,
+                            c.vgcpid,
+                            u.display_name AS assigned_tester_name
                         FROM tests t
                         JOIN controls c ON t.control_id = c.control_id
+                        LEFT JOIN users u ON t.assigned_tester_id = u.user_id
                         ORDER BY t.test_id DESC;
                     """
                     cur.execute(query)
