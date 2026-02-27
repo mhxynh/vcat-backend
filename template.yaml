@@ -205,6 +205,20 @@ Resources:
             Path: /notifications
             Method: get
 
+  UserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/users/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
+      Events:
+        GetUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: get
+
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
