@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS controls (
     control_id      BIGSERIAL PRIMARY KEY,
     vgcpid          VARCHAR(50) UNIQUE NOT NULL,
-    description     TEXT,
+    description     TEXT NOT NULL,
     control_owner   TEXT NOT NULL,
     control_sme     TEXT,
     escalation      BOOLEAN NOT NULL DEFAULT FALSE,
@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS controls (
 CREATE TABLE IF NOT EXISTS requests (
     request_id      BIGSERIAL PRIMARY KEY,
     requestor       TEXT NOT NULL,
+    description     TEXT NOT NULL,
     start_date      DATE,
     due_date        DATE NOT NULL,
     complete_date   DATE,
