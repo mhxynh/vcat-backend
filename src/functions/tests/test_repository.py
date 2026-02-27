@@ -11,7 +11,7 @@ class TestRepository:
                     query = """
                         SELECT t.*, c.vgcpid
                         FROM tests t
-                        JOIN controls c ON t.control_id = c.control_id;
+                        JOIN controls c ON t.control_id = c.control_id
                         ORDER BY t.test_id DESC;
                     """
                     cur.execute(query)

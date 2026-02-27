@@ -84,8 +84,8 @@ Resources:
   TestsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/functions/tests/
-      Handler: main.lambda_handler
+      CodeUri: src/
+      Handler: functions.tests.main.lambda_handler
       Layers:
         - !Ref CommonDependencyLayer
       Events:
