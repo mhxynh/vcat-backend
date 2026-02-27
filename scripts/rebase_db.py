@@ -37,6 +37,15 @@ def run_rebase():
     print("\nStarting database rebase...")
 
     try:
+        print("Kicking active connections...")
+        kill_connections_sql = f"""
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = '{db_name}' AND pid <> pg_backend_pid();
+        """
+        cmd = ["psql", db_url, "-c", kill_connections_sql]
+        subprocess.run(cmd, capture_output=True)
+
         print("Wiping existing tables and data...")
         run_psql(db_url, ["-c", "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"])
 
