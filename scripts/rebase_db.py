@@ -11,7 +11,7 @@ SCHEMA_PATH = REPO_ROOT / "database" / "schema.sql"
 SEED_PATH = REPO_ROOT / "database" / "seed.sql"
 
 def run_psql(db_url: str, args: list):
-    cmd = ["psql", db_url, "-v", "ON_ERROR_STOP=1"] + args
+    cmd = ["psql", "-d", db_url, "-v", "ON_ERROR_STOP=1"] + args
     subprocess.run(cmd, check=True, timeout=15)
 
 def run_rebase():
@@ -39,7 +39,7 @@ def run_rebase():
     try:
         print("Kicking active connections...")
         kill_connections_sql = f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
-        subprocess.run(["psql", admin_db_url, "-c", kill_connections_sql], timeout=10)
+        subprocess.run(["psql", "-d", admin_db_url, "-c", kill_connections_sql], timeout=10)
 
         print("Wiping existing tables and data...")
         run_psql(target_db_url, ["-c", "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"])
