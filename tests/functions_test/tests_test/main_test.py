@@ -244,28 +244,6 @@ class TestTestsMain(TestCase):
         result = tests_main.lambda_handler(event, None)
         self.assertEqual(result["statusCode"], 405)
         self.assertIn("Method not allowed", json.loads(result["body"])["error"])
-
-    # Helper Methods
-
-    def test_extract_test_id_from_path_params(self):
-        event = {"pathParameters": {"test_id": "42"}}
-        result = tests_main.extract_test_id(event, "/tests/42")
-        self.assertEqual(result, "42")
-
-    def test_extract_test_id_from_raw_path(self):
-        event = {"pathParameters": {}}
-        result = tests_main.extract_test_id(event, "/tests/42")
-        self.assertEqual(result, "42")
-
-    def test_extract_test_id_handles_null_path_params(self):
-        event = {"pathParameters": None}
-        result = tests_main.extract_test_id(event, "/tests/42")
-        self.assertEqual(result, "42")
-
-    def test_extract_test_id_returns_none_for_base_path(self):
-        event = {"pathParameters": None}
-        result = tests_main.extract_test_id(event, "/tests")
-        self.assertIsNone(result)
     
     # Exception Handling
 

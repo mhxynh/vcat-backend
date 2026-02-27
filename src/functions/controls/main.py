@@ -1,29 +1,8 @@
 import json
-from constants.common_variables import LogLevels, Methods, StatusCodes
+from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
-
-def get_method_and_path(event):
-    method = event.get("httpMethod")
-    path = event.get("path")
-
-    if not method:
-        method = event.get("requestContext", {}).get("http", {}).get("method")
-    if not path:
-        path = event.get("rawPath")
-
-    return method or "", path or ""
-
-def extract_vgcpid(event, path):
-    path_params = event.get("pathParameters", {})
-    if "vgcpid" in path_params and path_params["vgcpid"] is not None:
-        return str(path_params["vgcpid"])
-
-    parts = path.strip("/").split("/")
-    if len(parts) == 2 and parts[0] == "controls":
-        return parts[1]
-    return None
 
 def lambda_handler(event, context):
     Logger.start()
@@ -35,21 +14,21 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Controls Function Started")
 
     try:
-        method, path = get_method_and_path(event)
+        method, path = ResponseUtils.get_method_and_path(event)
         normalized_path = path.rstrip("/")
         method = method.upper()
 
         # GET /controls : List all controls (active and inactive)
         if method == Methods.GET and normalized_path == "/controls":
-            controls = CrudUtils.get_all("controls")
+            controls = CrudUtils.get_all(TableNames.CONTROLS)
             Logger.log(level=LogLevels.INFO, message="Returning controls", extra_fields={"count": len(controls)})
             return ResponseUtils.http_response(StatusCodes.OK, controls)
 
         # GET /controls/{vgcpid} : Get a single control by vgcpid
         if method == Methods.GET:
-            vgcpid = extract_vgcpid(event, normalized_path)
+            vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             
-            control = CrudUtils.get_by_id("controls", "vgcpid", vgcpid)
+            control = CrudUtils.get_by_id(TableNames.CONTROLS, "vgcpid", vgcpid)
             if not control:
                 Logger.log(level=LogLevels.WARNING, message="Control not found", extra_fields={"vgcpid": vgcpid})
                 return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Control not found", "vgcpid": vgcpid})
@@ -58,7 +37,7 @@ def lambda_handler(event, context):
             return ResponseUtils.http_response(StatusCodes.OK, control)
 
         # POST /controls : Create a new control
-        if method == Methods.POST and normalized_path == "/controls":
+        if method == Methods.POST:
             body = json.loads(event.get("body", "{}"))
 
             required_fields = ["vgcpid", "description", "control_owner", "control_sme"]
@@ -69,21 +48,21 @@ def lambda_handler(event, context):
 
             columns = ["vgcpid", "description", "control_owner", "control_sme", "escalation", "is_active"]
             values = [
-                body["vgcpid"],
-                body["description"],
-                body["control_owner"],
-                body["control_sme"],
+                body.get("vgcpid"),
+                body.get("description"),
+                body.get("control_owner"),
+                body.get("control_sme"),
                 body.get("escalation", False),
                 True,
             ]
 
-            created = CrudUtils.create("controls", columns, values)
+            created = CrudUtils.create(TableNames.CONTROLS, columns, values)
             Logger.log(level=LogLevels.INFO, message="Created control", extra_fields={"vgcpid": body["vgcpid"]})
             return ResponseUtils.http_response(StatusCodes.OK, created)
 
         # PUT /controls/{vgcpid} : Update an existing control by vgcpid
         if method == Methods.PUT:
-            vgcpid = extract_vgcpid(event, normalized_path)
+            vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             if vgcpid is None:
                 Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "VGCPID not provided"})
@@ -100,7 +79,7 @@ def lambda_handler(event, context):
                 Logger.log(level=LogLevels.ERROR, message="No valid fields to update")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No valid fields", "allowed": allowed_fields})
 
-            updated = CrudUtils.update("controls", "vgcpid", vgcpid, updates)
+            updated = CrudUtils.update(TableNames.CONTROLS, "vgcpid", vgcpid, updates)
             if not updated:
                 Logger.log(level=LogLevels.WARNING, message="Control not found", extra_fields={"vgcpid": vgcpid})
                 return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Control not found", "vgcpid": vgcpid})
@@ -108,9 +87,9 @@ def lambda_handler(event, context):
             Logger.log(level=LogLevels.INFO, message="Updated control", extra_fields={"vgcpid": vgcpid})
             return ResponseUtils.http_response(StatusCodes.OK, updated)
         
-        # DELETE /controls/{vgcpid} : Soft-deactivate or hard-delete a control by vgcpid
+        # DELETE /controls/{vgcpid} : Retire or Hard Delete a control by vgcpid
         if method == Methods.DELETE:
-            vgcpid = extract_vgcpid(event, normalized_path)
+            vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             if vgcpid is None:
                 Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path for delete")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "VGCPID not provided"})
@@ -120,7 +99,7 @@ def lambda_handler(event, context):
             hard = hard_flag == "true"
 
             if hard:
-                deleted = CrudUtils.hard_delete("controls", "vgcpid", vgcpid)
+                deleted = CrudUtils.hard_delete(TableNames.CONTROLS, "vgcpid", vgcpid)
                 if not deleted:
                     Logger.log(level=LogLevels.WARNING, message="Control not found for hard delete", extra_fields={"vgcpid": vgcpid})
                     return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Control not found", "vgcpid": vgcpid})
@@ -128,7 +107,7 @@ def lambda_handler(event, context):
                 Logger.log(level=LogLevels.INFO, message="Hard deleted control", extra_fields={"vgcpid": vgcpid})
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
             else:
-                deactivated = CrudUtils.deactivate("controls", "vgcpid", vgcpid)
+                deactivated = CrudUtils.deactivate(TableNames.CONTROLS, "vgcpid", vgcpid)
                 if not deactivated:
                     Logger.log(level=LogLevels.WARNING, message="Control not found for deactivate", extra_fields={"vgcpid": vgcpid})
                     return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Control not found", "vgcpid": vgcpid})

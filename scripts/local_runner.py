@@ -50,9 +50,9 @@ if __name__ == "__main__":
     The output will show the status code and response body in a readable format.
     '''
     parser = argparse.ArgumentParser(description="Invoke a Lambda locally with a simulated API Gateway event")
-    parser.add_argument("--lambda-name", default="controls", help="Lambda function folder name (e.g., 'controls')")
+    parser.add_argument("--lambda-name", default="requests", help="Lambda function folder name (e.g., 'controls')")
     parser.add_argument("--method", default="DELETE", help="HTTP method")
-    parser.add_argument("--vgcpid", default="VGCP-99999", help="Resource ID for /controls/{vgcpid}")
+    parser.add_argument("--id", default="6", help="Resource ID for /controls/{id}")
     parser.add_argument("--params", default='{"hard": "true"}', help='Query params as JSON object (e.g. {"hard": "true"}). Only JSON accepted.')
     # Body is provided for testing the POST /controls endpoint. Adjust as needed: "{"vgcpid": "VGCP-99999", "description": "Description for control 21", "control_owner": "Owner 67", "control_sme": "SME 5"}"
     parser.add_argument("--body", default=None, help="JSON body string for POST/PUT")
@@ -68,9 +68,9 @@ if __name__ == "__main__":
     base_path = f"/{args.lambda_name}"
     path_parameters = None
 
-    if args.vgcpid:
-        path = f"{base_path}/{args.vgcpid}"
-        path_parameters = {"vgcpid": args.vgcpid}
+    if args.id:
+        path = f"{base_path}/{args.id}"
+        path_parameters = {"id": args.id}
     else:
         path = base_path
 
