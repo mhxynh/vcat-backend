@@ -298,3 +298,4 @@ class TestRepository:
         except Exception as e:
             Logger.log(level="ERROR", message="Error hard deleting test", extra_fields={"error": str(e), "test_id": test_id})
             raise e
+ 
