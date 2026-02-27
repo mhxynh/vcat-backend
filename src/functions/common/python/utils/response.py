@@ -16,3 +16,21 @@ class ResponseUtils:
             "body": json.dumps(payload, default=ResponseUtils.default_serializer),
             "headers": {"Content-Type": "application/json"},
         }
+    
+    @staticmethod
+    def get_method_and_path(event):
+        method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
+        path = event.get("path") or event.get("rawPath")
+
+        return method or "", path or ""
+
+    @staticmethod
+    def extract_id(event, path, resource):
+        path_params = event.get("pathParameters", {}) or {}
+        if "id" in path_params and path_params["id"] is not None:
+            return str(path_params["id"])
+
+        parts = (path or "").strip("/").split("/")
+        if len(parts) >= 2 and parts[0] == resource:
+            return parts[1]
+        return None

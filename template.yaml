@@ -63,7 +63,7 @@ Resources:
         GetControlById:
           Type: Api
           Properties:
-            Path: /controls/{vgcpid}
+            Path: /controls/{id}
             Method: get
         CreateControl:
           Type: Api
@@ -73,12 +73,12 @@ Resources:
         UpdateControl:
           Type: Api
           Properties:
-            Path: /controls/{vgcpid}
+            Path: /controls/{id}
             Method: put
         DeleteControl:
           Type: Api
           Properties:
-            Path: /controls/{vgcpid}
+            Path: /controls/{id}
             Method: delete
 
   TestsFunction:
@@ -128,6 +128,26 @@ Resources:
           Properties:
             Path: /requests
             Method: get
+        GetRequestById:
+          Type: Api
+          Properties:
+            Path: /requests/{id}
+            Method: get
+        CreateRequest:
+          Type: Api
+          Properties:
+            Path: /requests
+            Method: post
+        UpdateRequest:
+          Type: Api
+          Properties:
+            Path: /requests/{id}
+            Method: put
+        DeleteRequest:
+          Type: Api
+          Properties:
+            Path: /requests/{id}
+            Method: delete
 
   CommentsFunction:
     Type: AWS::Serverless::Function

@@ -1,24 +1,9 @@
 import json
-from constants.common_variables import LogLevels, Methods, StatusCodes
+from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
 from utils.crud import CrudUtils
 from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
-
-def get_method_and_path(event):
-    method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
-    path = event.get("path") or event.get("rawPath")
-    return (method or "").upper(), (path or "").rstrip("/")
-
-def extract_test_id(event, path):
-    path_params = event.get("pathParameters") or {}
-    if "test_id" in path_params and path_params["test_id"] is not None:
-        return str(path_params["test_id"])
-    
-    parts = path.strip("/").split("/")
-    if len(parts) >= 2 and parts[0] == "tests":
-        return parts[1]
-    return None
 
 def lambda_handler(event, context):
     Logger.start()
@@ -28,8 +13,8 @@ def lambda_handler(event, context):
         return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
 
     try:
-        method, normalized_path = get_method_and_path(event)
-        test_id = extract_test_id(event, normalized_path)
+        method, normalized_path = ResponseUtils.get_method_and_path(event)
+        test_id = ResponseUtils.extract_id(event, normalized_path, TableNames.TESTS)
     
         if method == Methods.GET:
             # GET /tests/{test_id}
