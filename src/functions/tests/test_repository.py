@@ -6,27 +6,28 @@ from utils.logger import Logger
 class TestRepository:
     @staticmethod
     def get_all_tests():
+        conn = None
         try:
             conn = DbUtils.get_db_connection()
-            try:
-                with conn.cursor() as cur:
-                    query = """
-                        SELECT
-                            t.*,
-                            c.vgcpid,
-                            u.display_name AS assigned_tester_name
-                        FROM tests t
-                        JOIN controls c ON t.control_id = c.control_id
-                        LEFT JOIN users u ON t.assigned_tester_id = u.user_id
-                        ORDER BY t.test_id DESC;
-                    """
-                    cur.execute(query)
-                    return [dict(row) for row in cur.fetchall()]
-            finally:
-                conn.close()
+            with conn.cursor() as cur:
+                query = """
+                    SELECT
+                        t.*,
+                        c.vgcpid,
+                        u.display_name AS assigned_tester_name
+                    FROM tests t
+                    JOIN controls c ON t.control_id = c.control_id
+                    LEFT JOIN users u ON t.assigned_tester_id = u.user_id
+                    ORDER BY t.test_id DESC;
+                """
+                cur.execute(query)
+                return [dict(row) for row in cur.fetchall()]
         except Exception as e:
             Logger.log(level="ERROR", message="Error fetching all tests", extra_fields={"error": str(e)})
             raise e
+        finally:
+            if conn:
+                conn.close()
     
     @staticmethod
     def get_tests_by_id(test_id):
@@ -160,7 +161,7 @@ class TestRepository:
                 with conn.cursor() as cur:
                     query = """
                         UPDATE tests
-                        SET dat_step = %s, status = %s
+                        SET dat_step = COALESCE(dat_step, %s), status = COALESCE(%s, status)
                         WHERE test_id = %s
                         RETURNING *;
                     """
@@ -182,7 +183,7 @@ class TestRepository:
                 with conn.cursor() as cur:
                     query = """
                         UPDATE tests
-                        SET oet_step = %s, status = %s
+                        SET oet_step = COALESCE(oet_step, %s), status = COALESCE(%s, status)
                         WHERE test_id = %s
                         RETURNING *;
                     """
@@ -248,7 +249,7 @@ class TestRepository:
                 with conn.cursor() as cur:
                     query = """
                         UPDATE tests
-                        SET status = 'COMPLETED', complete_date = current_date
+                        SET status = 'COMPLETED', complete_date = COALESCE(complete_date, current_date)
                         WHERE test_id = %s
                         RETURNING *;
                     """
