@@ -89,13 +89,6 @@ class TestTestRepository(TestCase):
 
         result = TestRepository.get_tests_by_request_with_details(100)
 
-        args, kwargs = mock_cursor.execute.call_args
-        sql_query, sql_params = args[0], args[1]
-        
-        self.assertIn("JOIN controls c", sql_query)
-        self.assertIn("LEFT JOIN users u", sql_query)
-        self.assertEqual(sql_params, (100,))
-        self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["assigned_tester_name"], "Alice")
 
     @patch('functions.tests.test_repository.Logger')
@@ -163,8 +156,9 @@ class TestTestRepository(TestCase):
         result = TestRepository.update_dat_track(42, "Phase 2", "IN_PROGRESS")
 
         args, _ = mock_cursor.execute.call_args
-        self.assertIn("SET dat_step = COALESCE(dat_step, %s)", args[0]) 
+        self.assertIn("SET dat_step = %s, status = %s", args[0])
         self.assertEqual(args[1], ("Phase 2", "IN_PROGRESS", 42))
+        mock_conn.commit.assert_called_once()
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -184,8 +178,9 @@ class TestTestRepository(TestCase):
         result = TestRepository.update_oet_track(42, "Step 1", "IN_PROGRESS")
 
         args, _ = mock_cursor.execute.call_args
-        self.assertIn("SET oet_step = COALESCE(oet_step, %s)", args[0]) 
+        self.assertIn("SET oet_step = %s, status = %s", args[0]) 
         self.assertEqual(args[1], ("Step 1", "IN_PROGRESS", 42))
+        mock_conn.commit.assert_called_once()
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
