@@ -8,7 +8,7 @@ class CrudUtils:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"SELECT * FROM {table}")
+                    cur.execute(f"SELECT * FROM {table} ORDER BY vgcpid DESC") 
                     return [dict(row) for row in cur.fetchall()]
             finally:
                 conn.close()

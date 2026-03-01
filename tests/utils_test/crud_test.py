@@ -27,7 +27,7 @@ class TestCrudUtils(TestCase):
 
         result = CrudUtils.get_all("controls")
 
-        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls")
+        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls ORDER BY vgcpid DESC")
         mock_conn.close.assert_called_once()
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["vgcpid"], "VGCP-001")

@@ -40,7 +40,7 @@ def lambda_handler(event, context):
         if method == Methods.POST:
             body = json.loads(event.get("body", "{}"))
 
-            required_fields = ["vgcpid", "description", "control_owner", "control_sme"]
+            required_fields = ["vgcpid", "description", "control_owner", "escalation"]
             missing = [field for field in required_fields if field not in body]
             if missing:
                 Logger.log(level=LogLevels.ERROR, message="Missing fields in request body", extra_fields={"missing_fields": missing})
