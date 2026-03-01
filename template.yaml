@@ -223,11 +223,6 @@ Resources:
           Properties:
             Path: /users/{id}
             Method: get
-        CreateUser:
-          Type: Api
-          Properties:
-            Path: /users
-            Method: post
         DeleteUser:
           Type: Api
           Properties:
