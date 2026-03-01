@@ -19,93 +19,47 @@ def lambda_handler(event, context):
         normalized_path = (path or "").rstrip("/")
         method = (method or "").upper()
 
-        # GET /users : list all users or filter by email/is_active via query params
+        # GET /users : List all users or filter by query params (?email=, ?is_active=)
         if method == Methods.GET and normalized_path == "/users":
-            params = event.get("queryStringParameters") or {}
+            params = event.get("queryStringParameters", {})
+
+            # Filter by email
             if params and params.get("email"):
-                user = CrudUtils.get_by_id(TableNames.USERS, "email", params.get("email"))
-                if not user:
-                    Logger.log(level=LogLevels.WARNING, message="User not found", extra_fields={"email": params.get("email")})
-                    return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "email": params.get("email")})
-                Logger.log(level=LogLevels.INFO, message="Returning user by email", extra_fields={"email": params.get("email")})
-                return ResponseUtils.http_response(StatusCodes.OK, user)
+                email = params.get("email")
+                results = CrudUtils.get_by_filter(TableNames.USERS, "email", email)
+                if not results:
+                    Logger.log(level=LogLevels.WARNING, message="User not found by email", extra_fields={"email": email})
+                    return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "email": email})
+                return ResponseUtils.http_response(StatusCodes.OK, results[0])
 
-            if params and params.get("active"):
-                active_flag = str(params.get("active")).lower()
-                if active_flag == "true":
-                    users = CrudUtils.get_all(TableNames.USERS)  # get_all returns all; filter client-side not ideal
-                    users = [u for u in users if u.get("is_active")]
-                elif active_flag == "false":
-                    users = CrudUtils.get_all(TableNames.USERS)
-                    users = [u for u in users if not u.get("is_active")]
-                else:
-                    users = CrudUtils.get_all(TableNames.USERS)
-            else:
-                users = CrudUtils.get_all(TableNames.USERS)
+            # Filter by active status
+            if params and params.get("is_active"):
+                raw = params.get("is_active")
+                is_active = str(raw).lower() == "true"
+                results = CrudUtils.get_by_filter(TableNames.USERS, "is_active", is_active)
+                Logger.log(level=LogLevels.INFO, message="Returning users filtered by is_active", extra_fields={"is_active": is_active, "count": len(results)})
+                return ResponseUtils.http_response(StatusCodes.OK, results)
 
+            # No filters: return all
+            users = CrudUtils.get_all(TableNames.USERS)
             Logger.log(level=LogLevels.INFO, message="Returning users", extra_fields={"count": len(users)})
             return ResponseUtils.http_response(StatusCodes.OK, users)
 
         # GET /users/{id}
         if method == Methods.GET:
-            user_id = ResponseUtils.extract_id(event, normalized_path, "users")
-            if user_id is None:
-                Logger.log(level=LogLevels.ERROR, message="User ID not provided in path")
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "User ID not provided"})
-
+            user_id = ResponseUtils.extract_id(event, normalized_path, TableNames.USERS)
+            
             user = CrudUtils.get_by_id(TableNames.USERS, "user_id", user_id)
             if not user:
                 Logger.log(level=LogLevels.WARNING, message="User not found", extra_fields={"user_id": user_id})
                 return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "user_id": user_id})
-
+            
             Logger.log(level=LogLevels.INFO, message="Returning user", extra_fields={"user_id": user_id})
             return ResponseUtils.http_response(StatusCodes.OK, user)
 
-        # POST /users : create a new user
-        if method == Methods.POST:
-            body = json.loads(event.get("body", "{}"))
-            required_fields = ["email", "role", "display_name"]
-            missing = [f for f in required_fields if f not in body]
-            if missing:
-                Logger.log(level=LogLevels.ERROR, message="Missing fields in request body", extra_fields={"missing": missing})
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Missing required fields", "missing": missing})
-
-            columns = ["email", "role", "display_name", "is_active"]
-            values = [body.get("email"), body.get("role"), body.get("display_name"), True]
-            created = CrudUtils.create(TableNames.USERS, columns, values)
-
-            Logger.log(level=LogLevels.INFO, message="Created user", extra_fields={"user_id": created.get("user_id")})
-            return ResponseUtils.http_response(StatusCodes.OK, created)
-
-        # PUT /users/{id} : update user
-        if method == Methods.PUT:
-            user_id = ResponseUtils.extract_id(event, normalized_path, "users")
-            if user_id is None:
-                Logger.log(level=LogLevels.ERROR, message="User ID not provided in path for update")
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "User ID not provided"})
-
-            body = json.loads(event.get("body", "{}"))
-            if not body:
-                Logger.log(level=LogLevels.ERROR, message="No update data provided")
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No update data provided"})
-
-            allowed_fields = ["display_name", "role", "is_active"]
-            updates = {k: v for k, v in body.items() if k in allowed_fields}
-            if not updates:
-                Logger.log(level=LogLevels.ERROR, message="No valid fields to update", extra_fields={"allowed": allowed_fields})
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No valid fields to update", "allowed": allowed_fields})
-
-            updated = CrudUtils.update(TableNames.USERS, "user_id", user_id, updates)
-            if not updated:
-                Logger.log(level=LogLevels.WARNING, message="User not found for update", extra_fields={"user_id": user_id})
-                return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "user_id": user_id})
-
-            Logger.log(level=LogLevels.INFO, message="Updated user", extra_fields={"user_id": user_id, "updates": updates})
-            return ResponseUtils.http_response(StatusCodes.OK, updated)
-
-        # DELETE /users/{id} : deactivate user (soft)
+        # DELETE /users/{id} : Deactivate user
         if method == Methods.DELETE:
-            user_id = ResponseUtils.extract_id(event, normalized_path, "users")
+            user_id = ResponseUtils.extract_id(event, normalized_path, TableNames.USERS)
             if user_id is None:
                 Logger.log(level=LogLevels.ERROR, message="User ID not provided in path for delete")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "User ID not provided"})

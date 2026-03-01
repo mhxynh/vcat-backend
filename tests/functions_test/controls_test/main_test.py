@@ -2,7 +2,6 @@ import json
 from unittest import TestCase
 from unittest.mock import patch
 import functions.controls.main as controls
-from functions.common.python.utils.response import ResponseUtils
 
 class TestControlsMain(TestCase):
     def _build_event(self, method, path, body=None, path_params=None, query_params=None):

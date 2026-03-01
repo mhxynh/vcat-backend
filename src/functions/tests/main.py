@@ -25,7 +25,7 @@ def lambda_handler(event, context):
                 return ResponseUtils.http_response(StatusCodes.OK, test_record)
 
             # GET /tests?request_id=X&details=true: Get tests by request_id with optional details
-            params = event.get("queryStringParameters") or {}
+            params = event.get("queryStringParameters", {})
             request_id = params.get("request_id")
             control_id = params.get("control_id")
             details = str(params.get("details", "false")).lower() == "true"

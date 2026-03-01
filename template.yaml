@@ -218,6 +218,21 @@ Resources:
           Properties:
             Path: /users
             Method: get
+        GetUserById:
+          Type: Api
+          Properties:
+            Path: /users/{id}
+            Method: get
+        CreateUser:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: post
+        DeleteUser:
+          Type: Api
+          Properties:
+            Path: /users/{id}
+            Method: delete
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
