@@ -70,7 +70,7 @@ class TestControlsMain(TestCase):
     @patch('functions.controls.main.Logger')
     @patch('functions.controls.main.CrudUtils')
     def test_post_control_returns_200(self, mock_crud, mock_logger):
-        new_control = {"vgcpid": "VGCP-999", "description": "New", "control_owner": "Owner", "control_sme": "SME"}
+        new_control = {"vgcpid": "VGCP-999", "description": "New", "control_owner": "Owner", "escalation": True}
         mock_crud.create.return_value = {**new_control, "control_id": 10}
 
         event = self._build_event("POST", "/controls", body=new_control)
@@ -88,7 +88,7 @@ class TestControlsMain(TestCase):
         result = controls.lambda_handler(event, None)
 
         mock_crud.create.assert_not_called()
-        mock_logger.log.assert_any_call(level="ERROR", message="Missing fields in request body", extra_fields={"missing_fields": ["description", "control_owner", "control_sme"]})
+        mock_logger.log.assert_any_call(level="ERROR", message="Missing fields in request body", extra_fields={"missing_fields": ["description", "control_owner", "escalation"]})
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("missing", json.loads(result["body"]))
 
