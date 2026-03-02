@@ -126,6 +126,25 @@ class TestTestsMain(TestCase):
     # PUT /tests/{test_id}
 
     @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_details_returns_200(self, mock_repo):
+        # Mock the return value to match a successful update
+        mock_repo.update_details.return_value = {"test_id": "42", "description": "Updated desc"}
+        
+        # Ensure action matches your code: "update_details"
+        event = self._build_event("PUT", "/tests/42", body={
+            "action": "update_details", 
+            "description": "Updated desc",
+            "vgcpid": "VGCP-1",
+            "request_id": 1
+        }, path_params={"test_id": "42"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        # Verify the specific method and arguments are called
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"])["description"], "Updated desc")
+
+    @patch('functions.tests.main.TestRepository')
     def test_put_action_assign_returns_200(self, mock_repo):
         mock_repo.update_assigned_tester.return_value = {"test_id": "42", "assigned_tester_id": "7"}
         event = self._build_event("PUT", "/tests/42", body={"action": "assign", "assigned_tester_id": "7"}, path_params={"test_id": "42"})

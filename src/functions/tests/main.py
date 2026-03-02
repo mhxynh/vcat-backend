@@ -91,6 +91,18 @@ def lambda_handler(event, context):
                 updated_record = TestRepository.review_test(test_id)
             elif action == "complete":
                 updated_record = TestRepository.complete_test(test_id)
+            elif action == "update_details":
+                updated_record = TestRepository.update_details(
+                    test_id,
+                    body.get("vgcpid"),
+                    body.get("request_id"),
+                    body.get("assigned_tester_id"),
+                    body.get("requires_dat"),
+                    body.get("requires_oet"),
+                    body.get("due_date"),
+                    body.get("estimated_date"),
+                    body.get("description")
+                )
             else:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Invalid or missing action"})
 

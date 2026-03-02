@@ -147,6 +147,56 @@ class TestTestRepository(TestCase):
         mock_logger.log.assert_called_once()
 
     @patch('functions.tests.test_repository.DbUtils')
+    def test_update_details_success(self, mock_db):
+        """Test a full update of all test details."""
+        mock_row = {
+            "test_id": 42, "control_id": 10, "request_id": 2, 
+            "vgcpid": "VGCP-101010", "assigned_tester_id": 505
+        }
+        mock_conn, mock_cursor = self._mock_connection(mock_row, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_details(
+            42, "VGCP-101010", 2, 505, False, True, "2026-04-01", "2026-03-25", "Updated Desc"
+        )
+
+        args, _ = mock_cursor.execute.call_args
+        sql_query, sql_params = args[0], args[1]
+
+        self.assertIn("SET control_id = (SELECT control_id FROM controls WHERE vgcpid = %s)", sql_query)
+        self.assertIn("request_id = %s", sql_query)
+        self.assertIn("description = %s", sql_query)
+        
+        self.assertEqual(sql_params[0], "VGCP-101010")
+        self.assertEqual(sql_params[-1], 42) # test_id should be last for the WHERE clause
+        
+        mock_conn.commit.assert_called_once()
+        self.assertEqual(result["test_id"], 42)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_details_not_found(self, mock_db):
+        """Test returning None when details update fails to find the test_id."""
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_details(
+            999, "VGCP-FAIL", 1, 1, True, True, "2026-01-01", "2026-01-01", "None"
+        )
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_details_error(self, mock_db, mock_logger):
+        """Test that errors are logged and exceptions are raised during details update."""
+        mock_db.get_db_connection.side_effect = Exception("DB connection failed")
+
+        with self.assertRaises(Exception):
+            TestRepository.update_details(42, "VGCP-1", 1, 1, True, True, "2026", "2026", "Err")
+
+        mock_logger.log.assert_called_once()
+
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_assigned_tester_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "assigned_tester_id": 500}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
