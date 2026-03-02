@@ -152,6 +152,27 @@ class TestRepository:
             Logger.log(level="ERROR", message="Error creating test", extra_fields={"error": str(e), "vgcpid": vgcpid})
             raise e
 
+    @staticmethod
+    def update_assigned_tester(test_id, assigned_tester_id):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    query = """
+                        UPDATE tests
+                        SET assigned_tester_id = %s
+                        WHERE test_id = %s
+                        RETURNING *;
+                    """
+                    cur.execute(query, (assigned_tester_id, test_id))
+                    conn.commit()
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(level="ERROR", message="Error updating assigned tester", extra_fields={"error": str(e), "test_id": test_id, "assigned_tester_id": assigned_tester_id})
+            raise e
 
     @staticmethod
     def update_dat_track(test_id, dat_step, status):

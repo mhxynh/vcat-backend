@@ -76,7 +76,12 @@ def lambda_handler(event, context):
             action = body.get("action") 
             updated_record = None
             
-            if action == "update_dat":
+            if action == "assign":
+                tester_id = body.get("assigned_tester_id")
+                if tester_id is None:
+                    return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "assigned_tester_id is required"})
+                updated_record = TestRepository.update_assigned_tester(test_id, tester_id)
+            elif action == "update_dat":
                 updated_record = TestRepository.update_dat_track(test_id, body.get("dat_step"), body.get("status"))
             elif action == "update_oet":
                 updated_record = TestRepository.update_oet_track(test_id, body.get("oet_step"), body.get("status"))

@@ -147,6 +147,27 @@ class TestTestRepository(TestCase):
         mock_logger.log.assert_called_once()
 
     @patch('functions.tests.test_repository.DbUtils')
+    def test_update_assigned_tester_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "assigned_tester_id": 500}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_assigned_tester(42, 500)
+
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("SET assigned_tester_id = %s", args[0])
+        self.assertEqual(args[1], (500, 42))
+        mock_conn.commit.assert_called_once()
+        self.assertEqual(result["assigned_tester_id"], 500)
+
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_assigned_tester_error(self, mock_db, mock_logger):
+        mock_db.get_db_connection.side_effect = Exception("DB error")
+        with self.assertRaises(Exception):
+            TestRepository.update_assigned_tester(42, 500)
+        mock_logger.log.assert_called_once()
+
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_dat_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
             {"test_id": 42, "dat_step": "Phase 2", "status": "IN_PROGRESS"}, fetchone=True
