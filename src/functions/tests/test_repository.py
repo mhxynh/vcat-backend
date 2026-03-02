@@ -161,7 +161,7 @@ class TestRepository:
                 with conn.cursor() as cur:
                     query = """
                         UPDATE tests
-                        SET dat_step = %s, status = %s,
+                        SET dat_step = %s, status = %s
                         WHERE test_id = %s
                         RETURNING *;
                     """
