@@ -21,7 +21,7 @@ def lambda_handler(event, context):
 
         # GET /users : List all users or filter by query params (?email=, ?is_active=)
         if method == Methods.GET and normalized_path == "/users":
-            params = event.get("queryStringParameters", {})
+            params = event.get("queryStringParameters") or {}
 
             # Filter by email
             if params and params.get("email"):

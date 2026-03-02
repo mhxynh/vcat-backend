@@ -23,7 +23,7 @@ def lambda_handler(event, context):
                     return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "Test not found"})
                 return ResponseUtils.http_response(StatusCodes.OK, test_record)
 
-            params = event.get("queryStringParameters", {})
+            params = event.get("queryStringParameters") or {}
             request_id = params.get("request_id")
             control_id = params.get("control_id")
             details = str(params.get("details", "false")).lower() == "true"
