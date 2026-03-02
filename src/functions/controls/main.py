@@ -51,9 +51,9 @@ def lambda_handler(event, context):
                 body.get("vgcpid"),
                 body.get("description"),
                 body.get("control_owner"),
-                body.get("control_sme"),
-                body.get("escalation", False),
-                True,
+                None if body.get("control_sme") == "" else body.get("control_sme"),
+                body.get("escalation"),
+                True
             ]
 
             created = CrudUtils.create(TableNames.CONTROLS, columns, values)
