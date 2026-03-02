@@ -20,7 +20,7 @@ def lambda_handler(event, context):
 
         # GET /controls : List all controls (active and inactive)
         if method == Methods.GET and normalized_path == "/controls":
-            controls = CrudUtils.get_all(TableNames.CONTROLS)
+            controls = CrudUtils.get_all(TableNames.CONTROLS, order_by="control_id")
             Logger.log(level=LogLevels.INFO, message="Returning controls", extra_fields={"count": len(controls)})
             return ResponseUtils.http_response(StatusCodes.OK, controls)
 
@@ -40,7 +40,7 @@ def lambda_handler(event, context):
         if method == Methods.POST:
             body = json.loads(event.get("body", "{}"))
 
-            required_fields = ["vgcpid", "description", "control_owner", "control_sme"]
+            required_fields = ["vgcpid", "description", "control_owner", "escalation"]
             missing = [field for field in required_fields if field not in body]
             if missing:
                 Logger.log(level=LogLevels.ERROR, message="Missing fields in request body", extra_fields={"missing_fields": missing})

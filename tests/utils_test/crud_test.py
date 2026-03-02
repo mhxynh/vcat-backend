@@ -33,6 +33,20 @@ class TestCrudUtils(TestCase):
         self.assertEqual(result[0]["vgcpid"], "VGCP-001")
 
     @patch('utils.crud.DbUtils')
+    def test_get_all_with_order_by(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection([
+            {"control_id": 1, "vgcpid": "VGCP-001"},
+            {"control_id": 2, "vgcpid": "VGCP-002"},
+        ])
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.get_all("controls", order_by="control_id")
+
+        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls ORDER BY control_id DESC")
+        mock_conn.close.assert_called_once()
+        self.assertEqual(len(result), 2)
+
+    @patch('utils.crud.DbUtils')
     def test_get_all_returns_empty_list(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection([])
         mock_db.get_db_connection.return_value = mock_conn
