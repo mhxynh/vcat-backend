@@ -40,9 +40,9 @@ class TestCrudUtils(TestCase):
         ])
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = CrudUtils.get_all("controls", order_by="vgcpid")
+        result = CrudUtils.get_all("controls", order_by="control_id")
 
-        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls ORDER BY vgcpid DESC")
+        mock_cursor.execute.assert_called_once_with("SELECT * FROM controls ORDER BY control_id DESC")
         mock_conn.close.assert_called_once()
         self.assertEqual(len(result), 2)
 
