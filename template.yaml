@@ -37,6 +37,16 @@ Parameters:
     NoEcho: true
 
 Resources:
+  VcatApi:
+  Type: AWS::Serverless::Api
+  Properties:
+    StageName: Prod
+    Auth:
+      DefaultAuthorizer: MyCognitoAuthorizer
+      Authorizers:
+        MyCognitoAuthorizer:
+          UserPoolArn: !GetAtt MyUserPool.Arn
+
   CommonDependencyLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -47,6 +57,7 @@ Resources:
         - python3.12
     Metadata:
       BuildMethod: python3.12
+
   ControlsFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -60,26 +71,41 @@ Resources:
           Properties:
             Path: /controls
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         GetControlById:
           Type: Api
           Properties:
             Path: /controls/{id}
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         CreateControl:
           Type: Api
           Properties:
             Path: /controls
             Method: post
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         UpdateControl:
           Type: Api
           Properties:
             Path: /controls/{id}
             Method: put
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         DeleteControl:
           Type: Api
           Properties:
             Path: /controls/{id}
             Method: delete
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   TestsFunction:
     Type: AWS::Serverless::Function
@@ -94,26 +120,41 @@ Resources:
           Properties:
             Path: /tests
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         GetTestById:
           Type: Api
           Properties:
             Path: /tests/{test_id}
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         CreateTest:
           Type: Api
           Properties:
             Path: /tests
             Method: post
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         UpdateTest:
           Type: Api
           Properties:
             Path: /tests/{test_id}
             Method: put
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         DeleteTest:
           Type: Api
           Properties:
             Path: /tests/{test_id}
             Method: delete
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   RequestsFunction:
     Type: AWS::Serverless::Function
@@ -128,26 +169,41 @@ Resources:
           Properties:
             Path: /requests
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         GetRequestById:
           Type: Api
           Properties:
             Path: /requests/{id}
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         CreateRequest:
           Type: Api
           Properties:
             Path: /requests
             Method: post
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         UpdateRequest:
           Type: Api
           Properties:
             Path: /requests/{id}
             Method: put
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         DeleteRequest:
           Type: Api
           Properties:
             Path: /requests/{id}
             Method: delete
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   CommentsFunction:
     Type: AWS::Serverless::Function
@@ -162,6 +218,9 @@ Resources:
           Properties:
             Path: /comments
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   AuditFunction:
     Type: AWS::Serverless::Function
@@ -176,6 +235,9 @@ Resources:
           Properties:
             Path: /audit
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   ExportFunction:
     Type: AWS::Serverless::Function
@@ -190,6 +252,9 @@ Resources:
           Properties:
             Path: /export
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   NotificationsFunction:
     Type: AWS::Serverless::Function
@@ -204,6 +269,9 @@ Resources:
           Properties:
             Path: /notifications
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   UserFunction:
     Type: AWS::Serverless::Function

@@ -3,8 +3,14 @@ from constants.common_variables import LogLevels, Methods, StatusCodes, TableNam
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
+from utils.auth_utils import AuthUtils
 
 def lambda_handler(event, context):
+    method = event.get("httpMethod")
+
+    if method == "POST" and not AuthUtils.is_tester(event):
+        return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Tester access required"})
+    
     Logger.start()
 
     if len(event) == 0:
@@ -38,6 +44,10 @@ def lambda_handler(event, context):
 
         # POST /controls : Create a new control
         if method == Methods.POST:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized control creation attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+            
             body = json.loads(event.get("body", "{}"))
 
             required_fields = ["vgcpid", "description", "control_owner", "escalation"]
@@ -89,6 +99,10 @@ def lambda_handler(event, context):
         
         # DELETE /controls/{vgcpid} : Retire or Hard Delete a control by vgcpid
         if method == Methods.DELETE:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized control deletion attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+            
             vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             if vgcpid is None:
                 Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path for delete")

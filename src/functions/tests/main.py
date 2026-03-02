@@ -3,6 +3,7 @@ from constants.common_variables import LogLevels, Methods, StatusCodes, TableNam
 from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
+from utils.auth_utils import AuthUtils
 
 def lambda_handler(event, context):
     Logger.start()
@@ -44,6 +45,10 @@ def lambda_handler(event, context):
             return ResponseUtils.http_response(StatusCodes.OK, records)
 
         if method == Methods.POST and normalized_path == "/tests":
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized test creation attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+
             body = json.loads(event.get("body", "{}"))
             required = ["vgcpid", "request_id", "requires_dat", "requires_oet", "due_date", "description"]
             
@@ -69,6 +74,10 @@ def lambda_handler(event, context):
 
         # PUT /tests/{test_id}
         if method == Methods.PUT:
+            if not AuthUtils.is_tester(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized test update attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Tester access required"})
+
             if not test_id:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Test ID required for update"})
 
@@ -101,6 +110,10 @@ def lambda_handler(event, context):
 
         # DELETE /tests/{test_id}
         if method == Methods.DELETE:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized test deletion attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+
             if not test_id:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Test ID required for deletion"})
             
