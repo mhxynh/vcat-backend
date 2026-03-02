@@ -15,8 +15,8 @@ def lambda_handler(event, context):
 
     try:
         method, path = ResponseUtils.get_method_and_path(event)
-        normalized_path = path.rstrip("/")
-        method = method.upper()
+        normalized_path = (path or "").rstrip("/")
+        method = (method or "").upper()
 
         # GET /controls : List all controls (active and inactive)
         if method == Methods.GET and normalized_path == "/controls":
