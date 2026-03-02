@@ -20,7 +20,7 @@ def lambda_handler(event, context):
 
         # GET /controls : List all controls (active and inactive)
         if method == Methods.GET and normalized_path == "/controls":
-            controls = CrudUtils.get_all(TableNames.CONTROLS)
+            controls = CrudUtils.get_all(TableNames.CONTROLS, order_by="vgcpid")
             Logger.log(level=LogLevels.INFO, message="Returning controls", extra_fields={"count": len(controls)})
             return ResponseUtils.http_response(StatusCodes.OK, controls)
 

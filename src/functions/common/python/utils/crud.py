@@ -3,12 +3,15 @@ from utils.logger import Logger
 
 class CrudUtils:
     @staticmethod
-    def get_all(table):
+    def get_all(table, order_by=None):
         try:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"SELECT * FROM {table} ORDER BY vgcpid DESC") 
+                    if order_by:
+                        cur.execute(f"SELECT * FROM {table} ORDER BY {order_by} DESC") 
+                    else:
+                        cur.execute(f"SELECT * FROM {table}") 
                     return [dict(row) for row in cur.fetchall()]
             finally:
                 conn.close()
