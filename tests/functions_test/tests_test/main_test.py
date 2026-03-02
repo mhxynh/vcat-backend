@@ -126,6 +126,26 @@ class TestTestsMain(TestCase):
     # PUT /tests/{test_id}
 
     @patch('functions.tests.main.TestRepository')
+    def test_put_action_assign_returns_200(self, mock_repo):
+        mock_repo.update_assigned_tester.return_value = {"test_id": "42", "assigned_tester_id": "7"}
+        event = self._build_event("PUT", "/tests/42", body={"action": "assign", "assigned_tester_id": "7"}, path_params={"test_id": "42"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.update_assigned_tester.assert_called_once_with("42", "7")
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"])["assigned_tester_id"], "7")
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_assign_missing_tester_id_returns_400(self, mock_repo):
+        event = self._build_event("PUT", "/tests/42", body={"action": "assign"}, path_params={"test_id": "42"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("assigned_tester_id is required", json.loads(result["body"])["error"])
+
+    @patch('functions.tests.main.TestRepository')
     def test_put_action_start_returns_200(self, mock_repo):
         mock_repo.start_test.return_value = {"test_id": "42", "status": "IN_PROGRESS"}
         event = self._build_event("PUT", "/tests/42", body={"action": "start"}, path_params={"test_id": "42"})
