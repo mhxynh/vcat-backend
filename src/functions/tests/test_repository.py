@@ -153,6 +153,35 @@ class TestRepository:
             raise e
 
     @staticmethod
+    def update_details(test_id, vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    query = """
+                        UPDATE tests
+                        SET control_id = (SELECT control_id FROM controls WHERE vgcpid = %s),
+                            request_id = %s,
+                            assigned_tester_id = %s,
+                            requires_dat = %s,
+                            requires_oet = %s,
+                            due_date = %s,
+                            estimated_date = %s,
+                            description = %s
+                        WHERE test_id = %s
+                        RETURNING *;
+                    """
+                    cur.execute(query, (vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description, test_id))
+                    conn.commit()
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(level="ERROR", message="Error updating test details", extra_fields={"error": str(e), "test_id": test_id})
+            raise e
+
+    @staticmethod
     def update_assigned_tester(test_id, assigned_tester_id):
         try:
             conn = DbUtils.get_db_connection()
