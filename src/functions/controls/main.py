@@ -79,7 +79,7 @@ def lambda_handler(event, context):
                 Logger.log(level=LogLevels.ERROR, message="No update data provided")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No update data provided"})
 
-            allowed_fields = ["description", "control_owner", "control_sme", "escalation", "last_tested"]
+            allowed_fields = ["vgcpid", "description", "control_owner", "control_sme", "escalation", "last_tested"]
             updates = {field: value for field, value in body.items() if field in allowed_fields}
 
             if not updates:
