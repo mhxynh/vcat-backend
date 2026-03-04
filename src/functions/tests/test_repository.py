@@ -2,8 +2,17 @@ import json
 
 from utils.db_utils import DbUtils
 from utils.logger import Logger
+from utils.test_audit import TestAuditUtils
 
 class TestRepository:
+    @staticmethod
+    def set_audit_context(actor_user_id=None, reason=None):
+        TestAuditUtils.set_context(actor_user_id=actor_user_id, reason=reason)
+
+    @staticmethod
+    def clear_audit_context():
+        TestAuditUtils.clear_context()
+
     @staticmethod
     def get_all_tests():
         conn = None
@@ -143,9 +152,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    created = dict(row) if row else None
+                    TestAuditUtils.audit_create(cur, created)
+                    conn.commit()
+                    return created
             finally:
                 conn.close()
         except Exception as e:
@@ -158,6 +169,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET control_id = (SELECT control_id FROM controls WHERE vgcpid = %s),
@@ -172,9 +187,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description, test_id))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -187,6 +204,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET assigned_tester_id = %s
@@ -194,9 +215,16 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (assigned_tester_id, test_id))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(
+                        cur,
+                        before_row,
+                        updated,
+                        reason_override=(TestAuditUtils.get_context() or {}).get("reason") or "Reassigned test owner",
+                    )
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -209,6 +237,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET dat_step = %s, status = %s
@@ -216,9 +248,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (dat_step, status, test_id))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -231,6 +265,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET oet_step = %s, status = %s
@@ -238,9 +276,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (oet_step, status, test_id))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -253,6 +293,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET status = 'IN_PROGRESS', start_date = COALESCE(start_date, current_date)
@@ -260,9 +304,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (test_id,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -275,6 +321,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET status = 'IN_REVIEW'
@@ -282,9 +332,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (test_id,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -297,6 +349,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET status = 'COMPLETED', complete_date = COALESCE(complete_date, current_date)
@@ -304,9 +360,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (test_id,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
             finally:
                 conn.close()
         except Exception as e:
@@ -319,6 +377,10 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         UPDATE tests
                         SET status = 'ARCHIVED'
@@ -326,9 +388,11 @@ class TestRepository:
                         RETURNING *;
                     """
                     cur.execute(query, (test_id,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    archived = dict(row) if row else None
+                    TestAuditUtils.audit_soft_delete(cur, before_row, archived)
+                    conn.commit()
+                    return archived
             finally:
                 conn.close()
         except Exception as e:
@@ -341,15 +405,21 @@ class TestRepository:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
                     query = """
                         DELETE FROM tests
                         WHERE test_id = %s
                         RETURNING *;
                     """
                     cur.execute(query, (test_id,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    deleted = dict(row) if row else None
+                    TestAuditUtils.audit_hard_delete(cur, before_row, deleted)
+                    conn.commit()
+                    return deleted
             finally:
                 conn.close()
         except Exception as e:
