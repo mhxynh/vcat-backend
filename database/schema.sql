@@ -126,6 +126,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action          audit_action NOT NULL,
     before_snapshot JSONB,
     after_snapshot  JSONB,
+    snapshot_mode   TEXT NOT NULL DEFAULT 'FULL',
+    changed_fields  TEXT[],
+    payload_size_bytes INTEGER,
     changed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     reason          TEXT
 );
@@ -143,5 +146,8 @@ CREATE INDEX IF NOT EXISTS idx_comments_test ON comments(test_id);
 CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_changed_at ON audit_logs(changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_action_changed_at ON audit_logs(action, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_entity_changed_at ON audit_logs(entity_type, changed_at DESC);
 
 COMMIT;
