@@ -12,6 +12,12 @@ def lambda_handler(event, context):
         return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
 
     try:
+        body_for_context = ResponseUtils.get_json_body(event)
+        TestRepository.set_audit_context(
+            actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
+            reason=body_for_context.get("reason") or body_for_context.get("audit_reason"),
+        )
+
         method, normalized_path = ResponseUtils.get_method_and_path(event)
         test_id = ResponseUtils.extract_id(event, normalized_path, TableNames.TESTS)
     
@@ -146,3 +152,5 @@ def lambda_handler(event, context):
         # Default Fallback
         Logger.log(level=LogLevels.ERROR, message="Error in tests handler", extra_fields={"exception": error_message})
         return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": error_message})
+    finally:
+        TestRepository.clear_audit_context()

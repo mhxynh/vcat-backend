@@ -1,4 +1,3 @@
-import json
 from constants.common_variables import TableNames, Methods, StatusCodes, LogLevels
 from utils.crud import CrudUtils
 from utils.logger import Logger
@@ -15,6 +14,12 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Users Function Started")
 
     try:
+        body_for_context = ResponseUtils.get_json_body(event)
+        CrudUtils.set_audit_context(
+            actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
+            reason=body_for_context.get("reason") or body_for_context.get("audit_reason"),
+        )
+
         method, path = ResponseUtils.get_method_and_path(event)
         normalized_path = (path or "").rstrip("/")
         method = (method or "").upper()
@@ -77,3 +82,5 @@ def lambda_handler(event, context):
     except Exception as e:
         Logger.log(level=LogLevels.ERROR, message="Error in users handler", extra_fields={"exception": str(e)})
         return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)})
+    finally:
+        CrudUtils.clear_audit_context()
