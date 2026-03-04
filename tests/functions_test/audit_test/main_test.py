@@ -1,6 +1,8 @@
 import json
 from unittest import TestCase
-from functions.audit.main import lambda_handler
+from unittest.mock import MagicMock, patch
+
+from functions.audit.main import _get_audit_logs, _get_daily_metrics, _to_positive_int, lambda_handler
 
 class TestAuditMain(TestCase):
     def test_lambda_handler_returns_200(self):
@@ -9,3 +11,84 @@ class TestAuditMain(TestCase):
         self.assertEqual(result["statusCode"], 200)
         body = json.loads(result["body"])
         self.assertEqual(body["message"], "Audit API is working!")
+
+    def test_to_positive_int_bounds(self):
+        self.assertEqual(_to_positive_int("3", 7, minimum=1, maximum=5), 3)
+        self.assertEqual(_to_positive_int("0", 7, minimum=1, maximum=5), 7)
+        self.assertEqual(_to_positive_int("999", 7, minimum=1, maximum=5), 5)
+        self.assertEqual(_to_positive_int("bad", 7), 7)
+
+    @patch("functions.audit.main.DbUtils")
+    def test_get_audit_logs_builds_filters(self, mock_db):
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_cur.fetchall.return_value = [{"audit_id": 1}]
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_db.get_db_connection.return_value = mock_conn
+
+        params = {"entity_type": "control", "entity_id": "9", "actor_user_id": "3", "limit": "2", "offset": "1"}
+        rows = _get_audit_logs(params)
+
+        self.assertEqual(rows, [{"audit_id": 1}])
+        sql = mock_cur.execute.call_args[0][0]
+        values = mock_cur.execute.call_args[0][1]
+        self.assertIn("entity_type = %s", sql)
+        self.assertIn("entity_id = %s", sql)
+        self.assertIn("actor_user_id = %s", sql)
+        self.assertEqual(values[0], "CONTROL")
+        mock_conn.close.assert_called_once()
+
+    @patch("functions.audit.main.DbUtils")
+    def test_get_daily_metrics_with_entity_filter(self, mock_db):
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_cur.fetchall.return_value = [{"entity_type": "TEST", "creates": 1, "updates": 2, "deletes": 0}]
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+        mock_db.get_db_connection.return_value = mock_conn
+
+        rows = _get_daily_metrics({"days": "3", "entity_type": "test"})
+        self.assertEqual(len(rows), 1)
+        values = mock_cur.execute.call_args[0][1]
+        self.assertEqual(values, (3, "TEST"))
+        mock_conn.close.assert_called_once()
+
+    @patch("functions.audit.main.ResponseUtils")
+    def test_lambda_handler_non_get_returns_405(self, mock_response):
+        mock_response.get_method_and_path.return_value = ("POST", "/audit")
+        mock_response.http_response.return_value = {"statusCode": 405}
+        result = lambda_handler({"httpMethod": "POST"}, None)
+        self.assertEqual(result["statusCode"], 405)
+
+    @patch("functions.audit.main._get_daily_metrics")
+    @patch("functions.audit.main.ResponseUtils")
+    def test_lambda_handler_metrics_view(self, mock_response, mock_metrics):
+        mock_response.get_method_and_path.return_value = ("GET", "/audit")
+        mock_response.get_query_params.return_value = {"view": "metrics"}
+        mock_metrics.return_value = [{"creates": 1}]
+        mock_response.http_response.return_value = {"statusCode": 200, "body": "ok"}
+
+        result = lambda_handler({"httpMethod": "GET"}, None)
+        self.assertEqual(result["statusCode"], 200)
+        mock_metrics.assert_called_once()
+
+    @patch("functions.audit.main._get_audit_logs")
+    @patch("functions.audit.main.ResponseUtils")
+    def test_lambda_handler_logs_view(self, mock_response, mock_logs):
+        mock_response.get_method_and_path.return_value = ("GET", "/audit")
+        mock_response.get_query_params.return_value = {}
+        mock_logs.return_value = [{"audit_id": 1}]
+        mock_response.http_response.return_value = {"statusCode": 200, "body": "ok"}
+
+        result = lambda_handler({"httpMethod": "GET"}, None)
+        self.assertEqual(result["statusCode"], 200)
+        mock_logs.assert_called_once()
+
+    @patch("functions.audit.main.Logger")
+    @patch("functions.audit.main.ResponseUtils")
+    def test_lambda_handler_exception_returns_500(self, mock_response, mock_logger):
+        mock_response.get_method_and_path.side_effect = Exception("boom")
+        mock_response.http_response.return_value = {"statusCode": 500}
+
+        result = lambda_handler({"httpMethod": "GET"}, None)
+        self.assertEqual(result["statusCode"], 500)
+        mock_logger.log.assert_called_once()
