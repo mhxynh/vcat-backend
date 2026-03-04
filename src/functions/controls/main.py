@@ -40,7 +40,7 @@ def lambda_handler(event, context):
         if method == Methods.POST:
             body = json.loads(event.get("body", "{}"))
 
-            required_fields = ["vgcpid", "description", "control_owner", "escalation"]
+            required_fields = ["vgcpid", "description", "control_owner", "escalation", "last_tested"]
             missing = [field for field in required_fields if field not in body]
             if missing:
                 Logger.log(level=LogLevels.ERROR, message="Missing fields in request body", extra_fields={"missing_fields": missing})
@@ -72,7 +72,7 @@ def lambda_handler(event, context):
                 Logger.log(level=LogLevels.ERROR, message="No update data provided")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No update data provided"})
 
-            allowed_fields = ["description", "control_owner", "control_sme", "escalation", "last_tested"]
+            allowed_fields = ["vgcpid", "description", "control_owner", "control_sme", "escalation"]
             updates = {field: value for field, value in body.items() if field in allowed_fields}
 
             if not updates:
