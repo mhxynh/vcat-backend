@@ -35,7 +35,11 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE auditable_entity AS ENUM ('CONTROL', 'REQUEST', 'TEST', 'COMMENT', 'USER'); 
+    CREATE TYPE auditable_entity AS ENUM ('CONTROL', 'REQUEST', 'TEST', 'COMMENT', 'USER');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE snapshot_mode AS ENUM ('FULL_AFTER', 'FULL_BEFORE', 'DIFF');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ---------- FUNCTIONS ----------
@@ -126,7 +130,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action          audit_action NOT NULL,
     before_snapshot JSONB,
     after_snapshot  JSONB,
-    snapshot_mode   TEXT NOT NULL DEFAULT 'FULL',
+    snapshot_mode   snapshot_mode NOT NULL DEFAULT 'FULL_AFTER',
     changed_fields  TEXT[],
     payload_size_bytes INTEGER,
     changed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
