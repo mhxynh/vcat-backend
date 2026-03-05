@@ -90,7 +90,8 @@ def lambda_handler(event, context):
     Logger.start()
 
     if len(event) == 0:
-        return ResponseUtils.http_response(StatusCodes.OK, {"message": "Audit API is working!"})
+        Logger.log(level=LogLevels.ERROR, message="No event data provided")
+        return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
 
     Logger.log(level=LogLevels.INFO, message="Audit Function Started")
 
@@ -109,6 +110,6 @@ def lambda_handler(event, context):
 
         logs = get_audit_logs(params)
         return ResponseUtils.http_response(StatusCodes.OK, {"view": "logs", "data": logs, "count": len(logs)})
-    except Exception as exc:
-        Logger.log(level=LogLevels.ERROR, message="Error in audit handler", extra_fields={"exception": str(exc)})
-        return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+    except Exception as e:
+        Logger.log(level=LogLevels.ERROR, message="Error in audit handler", extra_fields={"exception": str(e)})
+        return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)})

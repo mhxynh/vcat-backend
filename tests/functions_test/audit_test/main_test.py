@@ -5,12 +5,12 @@ from unittest.mock import MagicMock, patch
 from functions.audit.main import get_audit_logs, get_daily_metrics, lambda_handler, to_positive_int
 
 class TestAuditMain(TestCase):
-    def test_lambda_handler_returns_200(self):
+    def test_lambda_handler_empty_event_returns_400(self):
         result = lambda_handler({}, None)
 
-        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(result["statusCode"], 400)
         body = json.loads(result["body"])
-        self.assertEqual(body["message"], "Audit API is working!")
+        self.assertEqual(body["error"], "No event data provided")
 
     def test_to_positive_int_bounds(self):
         self.assertEqual(to_positive_int("3", 7, minimum=1, maximum=5), 3)
