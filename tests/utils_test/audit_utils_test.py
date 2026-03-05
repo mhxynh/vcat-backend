@@ -61,7 +61,6 @@ class TestAuditUtils(TestCase):
             action="CREATE",
             before_snapshot=None,
             after_snapshot={"a": "b"},
-            reason="why",
             snapshot_mode="FULL_AFTER",
             changed_fields=["*"],
         )
@@ -76,7 +75,7 @@ class TestAuditUtils(TestCase):
             cur=MagicMock(),
             table="controls",
             created_row=row,
-            context={"actor_user_id": 10, "reason": "created"},
+            context={"actor_user_id": 10},
         )
         mock_insert.assert_called_once()
 
@@ -85,7 +84,7 @@ class TestAuditUtils(TestCase):
         cur = MagicMock()
         before = {"request_id": 1, "status": "NOT_STARTED"}
         after = {"request_id": 1, "status": "IN_PROGRESS"}
-        ctx = {"actor_user_id": 1, "reason": "move"}
+        ctx = {"actor_user_id": 1}
 
         AuditUtils.audit_update(cur, "requests", before, after, {"status": "IN_PROGRESS"}, ctx)
         self.assertEqual(mock_insert.call_count, 1)
@@ -98,7 +97,7 @@ class TestAuditUtils(TestCase):
         cur = MagicMock()
         before = {"user_id": 1, "is_active": True}
         deleted = {"user_id": 1, "is_active": False}
-        ctx = {"actor_user_id": 22, "reason": None}
+        ctx = {"actor_user_id": 22}
 
         AuditUtils.audit_delete(cur, "users", before, deleted, ctx, is_soft_delete=True)
         AuditUtils.audit_delete(cur, "users", before, deleted, ctx, is_soft_delete=False)

@@ -133,8 +133,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     snapshot_mode   snapshot_mode NOT NULL DEFAULT 'FULL_AFTER',
     changed_fields  TEXT[],
     payload_size_bytes INTEGER,
-    changed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    reason          TEXT
+    changed_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ---------- TRIGGERS ----------

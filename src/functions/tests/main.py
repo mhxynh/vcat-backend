@@ -15,7 +15,6 @@ def lambda_handler(event, context):
         body_for_context = ResponseUtils.get_json_body(event)
         TestRepository.set_audit_context(
             actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
-            reason=body_for_context.get("reason") or body_for_context.get("audit_reason"),
         )
 
         method, normalized_path = ResponseUtils.get_method_and_path(event)

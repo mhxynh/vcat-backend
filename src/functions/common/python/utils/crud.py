@@ -6,10 +6,9 @@ class CrudUtils:
     _audit_context = None
 
     @staticmethod
-    def set_audit_context(actor_user_id=None, reason=None):
+    def set_audit_context(actor_user_id=None):
         CrudUtils._audit_context = {
             "actor_user_id": actor_user_id,
-            "reason": reason,
         }
 
     @staticmethod

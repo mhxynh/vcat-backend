@@ -155,20 +155,15 @@ class AuditUtils:
         action,
         before_snapshot=None,
         after_snapshot=None,
-        reason=None,
         snapshot_mode=None,
         changed_fields=None,
         max_payload_bytes=DEFAULT_MAX_PAYLOAD_BYTES,
     ):
-        before_payload, before_truncated = AuditUtils.truncate_payload(before_snapshot, max_payload_bytes=max_payload_bytes)
-        after_payload, after_truncated = AuditUtils.truncate_payload(after_snapshot, max_payload_bytes=max_payload_bytes)
+        before_payload, _ = AuditUtils.truncate_payload(before_snapshot, max_payload_bytes=max_payload_bytes)
+        after_payload, _ = AuditUtils.truncate_payload(after_snapshot, max_payload_bytes=max_payload_bytes)
         before_payload = AuditUtils.to_json_safe(before_payload)
         after_payload = AuditUtils.to_json_safe(after_payload)
         payload_size_bytes = AuditUtils.snapshot_size_bytes(before_payload) + AuditUtils.snapshot_size_bytes(after_payload)
-        final_reason = reason
-        if before_truncated or after_truncated:
-            suffix = " [audit payload truncated]"
-            final_reason = (final_reason or "") + suffix
 
         cur.execute(
             """
@@ -181,10 +176,9 @@ class AuditUtils:
                 after_snapshot,
                 snapshot_mode,
                 changed_fields,
-                payload_size_bytes,
-                reason
+                payload_size_bytes
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING *
             """,
             (
@@ -197,7 +191,6 @@ class AuditUtils:
                 snapshot_mode,
                 changed_fields,
                 payload_size_bytes,
-                final_reason,
             ),
         )
         return dict(cur.fetchone())
@@ -215,7 +208,6 @@ class AuditUtils:
             action="CREATE",
             before_snapshot=None,
             after_snapshot=AuditUtils.snapshot_for_table(table, created_row),
-            reason=context.get("reason"),
             snapshot_mode="FULL_AFTER",
             changed_fields=["*"],
         )
@@ -251,7 +243,6 @@ class AuditUtils:
             action=action,
             before_snapshot=None if action == "UPDATE" else before_snapshot,
             after_snapshot=payload,
-            reason=context.get("reason"),
             snapshot_mode=snapshot_mode,
             changed_fields=changed_fields,
         )
@@ -266,11 +257,9 @@ class AuditUtils:
         if is_soft_delete:
             after_snapshot = {"is_active": False}
             changed_fields = ["is_active"]
-            reason = context.get("reason") or "Soft delete (deactivated record)"
         else:
             after_snapshot = None
             changed_fields = ["*"]
-            reason = context.get("reason")
 
         AuditUtils.insert_audit_row(
             cur=cur,
@@ -280,7 +269,6 @@ class AuditUtils:
             action="DELETE",
             before_snapshot=before_snapshot,
             after_snapshot=after_snapshot,
-            reason=reason,
             snapshot_mode="FULL_BEFORE",
             changed_fields=changed_fields,
         )

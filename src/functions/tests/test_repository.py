@@ -6,8 +6,8 @@ from utils.test_audit import TestAuditUtils
 
 class TestRepository:
     @staticmethod
-    def set_audit_context(actor_user_id=None, reason=None):
-        TestAuditUtils.set_context(actor_user_id=actor_user_id, reason=reason)
+    def set_audit_context(actor_user_id=None):
+        TestAuditUtils.set_context(actor_user_id=actor_user_id)
 
     @staticmethod
     def clear_audit_context():
@@ -217,12 +217,7 @@ class TestRepository:
                     cur.execute(query, (assigned_tester_id, test_id))
                     row = cur.fetchone()
                     updated = dict(row) if row else None
-                    TestAuditUtils.audit_update(
-                        cur,
-                        before_row,
-                        updated,
-                        reason_override=(TestAuditUtils.get_context() or {}).get("reason") or "Reassigned test owner",
-                    )
+                    TestAuditUtils.audit_update(cur, before_row, updated)
                     conn.commit()
                     return updated
             finally:

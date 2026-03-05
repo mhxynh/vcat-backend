@@ -9,7 +9,7 @@ class TestTestAuditUtils(TestCase):
         TestAuditUtils.clear_context()
 
     def test_context_set_get_clear(self):
-        TestAuditUtils.set_context(actor_user_id=7, reason="r")
+        TestAuditUtils.set_context(actor_user_id=7)
         self.assertEqual(TestAuditUtils.get_context()["actor_user_id"], 7)
         TestAuditUtils.clear_context()
         self.assertIsNone(TestAuditUtils.get_context())
@@ -31,25 +31,25 @@ class TestTestAuditUtils(TestCase):
         TestAuditUtils.audit_create(MagicMock(), {"test_id": 1})
         mock_insert.assert_not_called()
 
-        TestAuditUtils.set_context(actor_user_id=3, reason="x")
+        TestAuditUtils.set_context(actor_user_id=3)
         TestAuditUtils.audit_create(MagicMock(), {"test_id": 1, "status": "NOT_STARTED"})
         mock_insert.assert_called_once()
 
     @patch("utils.test_audit.AuditUtils.insert_audit_row")
     def test_audit_update_and_no_diff_guard(self, mock_insert):
-        TestAuditUtils.set_context(actor_user_id=3, reason="x")
+        TestAuditUtils.set_context(actor_user_id=3)
         before = {"test_id": 1, "status": "A"}
         after = {"test_id": 1, "status": "A"}
         TestAuditUtils.audit_update(MagicMock(), before, after)
         mock_insert.assert_not_called()
 
         after2 = {"test_id": 1, "status": "B"}
-        TestAuditUtils.audit_update(MagicMock(), before, after2, reason_override="override")
+        TestAuditUtils.audit_update(MagicMock(), before, after2)
         mock_insert.assert_called_once()
 
     @patch("utils.test_audit.AuditUtils.insert_audit_row")
     def test_audit_soft_and_hard_delete(self, mock_insert):
-        TestAuditUtils.set_context(actor_user_id=9, reason=None)
+        TestAuditUtils.set_context(actor_user_id=9)
         before = {"test_id": 2, "status": "IN_PROGRESS"}
         after = {"test_id": 2, "status": "ARCHIVED"}
         TestAuditUtils.audit_soft_delete(MagicMock(), before, after)

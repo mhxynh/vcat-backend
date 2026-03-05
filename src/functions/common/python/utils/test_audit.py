@@ -24,10 +24,9 @@ class TestAuditUtils:
     ]
 
     @staticmethod
-    def set_context(actor_user_id=None, reason=None):
+    def set_context(actor_user_id=None):
         TestAuditUtils._audit_context = {
             "actor_user_id": actor_user_id,
-            "reason": reason,
         }
 
     @staticmethod
@@ -64,13 +63,12 @@ class TestAuditUtils:
             action="CREATE",
             before_snapshot=None,
             after_snapshot=TestAuditUtils.snapshot(created_row),
-            reason=context.get("reason"),
             snapshot_mode="FULL_AFTER",
             changed_fields=["*"],
         )
 
     @staticmethod
-    def audit_update(cur, before_row, after_row, reason_override=None):
+    def audit_update(cur, before_row, after_row):
         context = TestAuditUtils.get_context()
         if not context or not after_row:
             return
@@ -89,13 +87,12 @@ class TestAuditUtils:
             action="UPDATE",
             before_snapshot=None,
             after_snapshot={"changed": diff},
-            reason=reason_override or context.get("reason"),
             snapshot_mode="DIFF",
             changed_fields=sorted(diff.keys()),
         )
 
     @staticmethod
-    def audit_soft_delete(cur, before_row, after_row, reason_override=None):
+    def audit_soft_delete(cur, before_row, after_row):
         context = TestAuditUtils.get_context()
         if not context or not after_row:
             return
@@ -108,7 +105,6 @@ class TestAuditUtils:
             action="DELETE",
             before_snapshot=TestAuditUtils.snapshot(before_row) if before_row else None,
             after_snapshot={"status": "ARCHIVED"},
-            reason=reason_override or context.get("reason") or "Soft delete (archived test)",
             snapshot_mode="FULL_BEFORE",
             changed_fields=["status"],
         )
@@ -127,7 +123,6 @@ class TestAuditUtils:
             action="DELETE",
             before_snapshot=TestAuditUtils.snapshot(before_row) if before_row else None,
             after_snapshot=None,
-            reason=context.get("reason"),
             snapshot_mode="FULL_BEFORE",
             changed_fields=["*"],
         )
