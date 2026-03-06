@@ -3,25 +3,6 @@ from utils.audit import AuditUtils
 
 class TestAuditUtils:
     _audit_context = None
-    TEST_AUDIT_FIELDS = [
-        "test_id",
-        "request_id",
-        "control_id",
-        "requires_dat",
-        "requires_oet",
-        "dat_step",
-        "oet_step",
-        "assigned_tester_id",
-        "description",
-        "start_date",
-        "estimated_date",
-        "due_date",
-        "complete_date",
-        "status",
-        "priority",
-        "created_at",
-        "updated_at",
-    ]
 
     @staticmethod
     def set_context(actor_user_id=None):
@@ -39,9 +20,7 @@ class TestAuditUtils:
 
     @staticmethod
     def snapshot(row):
-        if not row:
-            return None
-        return AuditUtils.compact_snapshot(row, TestAuditUtils.TEST_AUDIT_FIELDS)
+        return AuditUtils.snapshot_for_table("tests", row)
 
     @staticmethod
     def fetch_before(cur, test_id):
@@ -62,7 +41,7 @@ class TestAuditUtils:
             entity_id=created_row.get("test_id"),
             action="CREATE",
             before_snapshot=None,
-            after_snapshot=TestAuditUtils.snapshot(created_row),
+            after_snapshot=AuditUtils.snapshot_for_table("tests", created_row),
             snapshot_mode="FULL_AFTER",
             changed_fields=["*"],
         )
@@ -73,8 +52,8 @@ class TestAuditUtils:
         if not context or not after_row:
             return
 
-        before_snapshot = TestAuditUtils.snapshot(before_row) if before_row else None
-        after_snapshot = TestAuditUtils.snapshot(after_row)
+        before_snapshot = AuditUtils.snapshot_for_table("tests", before_row) if before_row else None
+        after_snapshot = AuditUtils.snapshot_for_table("tests", after_row)
         diff = AuditUtils.build_diff(before_snapshot or {}, after_snapshot or {})
         if not diff:
             return
@@ -103,7 +82,7 @@ class TestAuditUtils:
             entity_type="TEST",
             entity_id=after_row.get("test_id"),
             action="DELETE",
-            before_snapshot=TestAuditUtils.snapshot(before_row) if before_row else None,
+            before_snapshot=AuditUtils.snapshot_for_table("tests", before_row) if before_row else None,
             after_snapshot={"status": "ARCHIVED"},
             snapshot_mode="FULL_BEFORE",
             changed_fields=["status"],
@@ -121,7 +100,7 @@ class TestAuditUtils:
             entity_type="TEST",
             entity_id=deleted_row.get("test_id"),
             action="DELETE",
-            before_snapshot=TestAuditUtils.snapshot(before_row) if before_row else None,
+            before_snapshot=AuditUtils.snapshotot_for_table("tests", before_row) if before_row else None,
             after_snapshot=None,
             snapshot_mode="FULL_BEFORE",
             changed_fields=["*"],
