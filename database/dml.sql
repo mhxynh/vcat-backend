@@ -336,9 +336,11 @@ INSERT INTO audit_logs (
         action,
         before_snapshot,
         after_snapshot,
-        reason
+        snapshot_mode,
+        changed_fields,
+        payload_size_bytes
     )
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING *;
 
 -- Get all audit logs

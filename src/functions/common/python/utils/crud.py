@@ -1,7 +1,20 @@
 from utils.db_utils import DbUtils
 from utils.logger import Logger
+from utils.audit import AuditUtils
 
 class CrudUtils:
+    _audit_context = None
+
+    @staticmethod
+    def set_audit_context(actor_user_id=None):
+        CrudUtils._audit_context = {
+            "actor_user_id": actor_user_id,
+        }
+
+    @staticmethod
+    def clear_audit_context():
+        CrudUtils._audit_context = None
+
     @staticmethod
     def get_all(table, order_by=None):
         try:
@@ -57,8 +70,10 @@ class CrudUtils:
                     cols = ", ".join(columns)
                     placeholders = ", ".join(["%s"] * len(values))
                     cur.execute(f"INSERT INTO {table} ({cols}) VALUES ({placeholders}) RETURNING *", values)
+                    created_row = dict(cur.fetchone())
+                    AuditUtils.audit_create(cur, table, created_row, CrudUtils._audit_context)
                     conn.commit()
-                    return dict(cur.fetchone())
+                    return created_row
             finally:
                 conn.close()
         except Exception as e:
@@ -71,12 +86,26 @@ class CrudUtils:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
+                        cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                        before_row = cur.fetchone()
+
                     set_clause = ", ".join([f"{col} = %s" for col in updates.keys()])
                     values = list(updates.values()) + [pk_value]
                     cur.execute(f"UPDATE {table} SET {set_clause} WHERE {pk_column} = %s RETURNING *", values)
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    updated_row = dict(row) if row else None
+                    AuditUtils.audit_update(
+                        cur=cur,
+                        table=table,
+                        before_row=dict(before_row) if before_row else None,
+                        after_row=updated_row,
+                        updates=updates,
+                        context=CrudUtils._audit_context,
+                    )
+                    conn.commit()
+                    return updated_row
             finally:
                 conn.close()
         except Exception as e:
@@ -89,10 +118,24 @@ class CrudUtils:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
+                        cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                        before_row = cur.fetchone()
+
                     cur.execute(f"UPDATE {table} SET is_active = FALSE WHERE {pk_column} = %s RETURNING *", (pk_value,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    deactivated_row = dict(row) if row else None
+                    AuditUtils.audit_delete(
+                        cur=cur,
+                        table=table,
+                        before_row=dict(before_row) if before_row else None,
+                        deleted_row=deactivated_row,
+                        context=CrudUtils._audit_context,
+                        is_soft_delete=True,
+                    )
+                    conn.commit()
+                    return deactivated_row
             finally:
                 conn.close()
         except Exception as e:
@@ -105,10 +148,24 @@ class CrudUtils:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    before_row = None
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
+                        cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                        before_row = cur.fetchone()
+
                     cur.execute(f"DELETE FROM {table} WHERE {pk_column} = %s RETURNING *", (pk_value,))
-                    conn.commit()
                     row = cur.fetchone()
-                    return dict(row) if row else None
+                    deleted_row = dict(row) if row else None
+                    AuditUtils.audit_delete(
+                        cur=cur,
+                        table=table,
+                        before_row=dict(before_row) if before_row else None,
+                        deleted_row=deleted_row,
+                        context=CrudUtils._audit_context,
+                        is_soft_delete=False,
+                    )
+                    conn.commit()
+                    return deleted_row
             finally:
                 conn.close()
         except Exception as e:
