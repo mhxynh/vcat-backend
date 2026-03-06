@@ -1,5 +1,8 @@
 from utils.audit import AuditUtils
 
+_TEST_TABLE = "tests"
+_TEST_CONFIG = AuditUtils.get_table_audit_config(_TEST_TABLE)
+
 
 class TestAuditUtils:
     _audit_context = None
@@ -20,7 +23,7 @@ class TestAuditUtils:
 
     @staticmethod
     def snapshot(row):
-        return AuditUtils.snapshot_for_table("tests", row)
+        return AuditUtils.snapshot_for_table(_TEST_TABLE, row)
 
     @staticmethod
     def fetch_before(cur, test_id):
@@ -37,11 +40,11 @@ class TestAuditUtils:
         AuditUtils.insert_audit_row(
             cur=cur,
             actor_user_id=context.get("actor_user_id"),
-            entity_type="TEST",
-            entity_id=created_row.get("test_id"),
+            entity_type=_TEST_CONFIG["entity_type"],
+            entity_id=created_row.get(_TEST_CONFIG["id_column"]),
             action="CREATE",
             before_snapshot=None,
-            after_snapshot=AuditUtils.snapshot_for_table("tests", created_row),
+            after_snapshot=AuditUtils.snapshot_for_table(_TEST_TABLE, created_row),
             snapshot_mode="FULL_AFTER",
             changed_fields=["*"],
         )
@@ -52,8 +55,8 @@ class TestAuditUtils:
         if not context or not after_row:
             return
 
-        before_snapshot = AuditUtils.snapshot_for_table("tests", before_row) if before_row else None
-        after_snapshot = AuditUtils.snapshot_for_table("tests", after_row)
+        before_snapshot = AuditUtils.snapshot_for_table(_TEST_TABLE, before_row) if before_row else None
+        after_snapshot = AuditUtils.snapshot_for_table(_TEST_TABLE, after_row)
         diff = AuditUtils.build_diff(before_snapshot or {}, after_snapshot or {})
         if not diff:
             return
@@ -61,8 +64,8 @@ class TestAuditUtils:
         AuditUtils.insert_audit_row(
             cur=cur,
             actor_user_id=context.get("actor_user_id"),
-            entity_type="TEST",
-            entity_id=after_row.get("test_id"),
+            entity_type=_TEST_CONFIG["entity_type"],
+            entity_id=after_row.get(_TEST_CONFIG["id_column"]),
             action="UPDATE",
             before_snapshot=None,
             after_snapshot={"changed": diff},
@@ -79,10 +82,10 @@ class TestAuditUtils:
         AuditUtils.insert_audit_row(
             cur=cur,
             actor_user_id=context.get("actor_user_id"),
-            entity_type="TEST",
-            entity_id=after_row.get("test_id"),
+            entity_type=_TEST_CONFIG["entity_type"],
+            entity_id=after_row.get(_TEST_CONFIG["id_column"]),
             action="DELETE",
-            before_snapshot=AuditUtils.snapshot_for_table("tests", before_row) if before_row else None,
+            before_snapshot=AuditUtils.snapshot_for_table(_TEST_TABLE, before_row) if before_row else None,
             after_snapshot={"status": "ARCHIVED"},
             snapshot_mode="FULL_BEFORE",
             changed_fields=["status"],
@@ -97,10 +100,10 @@ class TestAuditUtils:
         AuditUtils.insert_audit_row(
             cur=cur,
             actor_user_id=context.get("actor_user_id"),
-            entity_type="TEST",
-            entity_id=deleted_row.get("test_id"),
+            entity_type=_TEST_CONFIG["entity_type"],
+            entity_id=deleted_row.get(_TEST_CONFIG["id_column"]),
             action="DELETE",
-            before_snapshot=AuditUtils.snapshotot_for_table("tests", before_row) if before_row else None,
+            before_snapshot=AuditUtils.snapshot_for_table(_TEST_TABLE, before_row) if before_row else None,
             after_snapshot=None,
             snapshot_mode="FULL_BEFORE",
             changed_fields=["*"],
