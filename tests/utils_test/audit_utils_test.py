@@ -46,7 +46,7 @@ class TestAuditUtils(TestCase):
 
     def test_is_archive_update(self):
         self.assertTrue(AuditUtils.is_archive_update({"status": "ARCHIVED"}))
-        self.assertFalse(AuditUtils.is_archive_update({"status": "IN_PROGRESS"}))
+        self.assertFalse(AuditUtils.is_archive_update({"status": "DAT_IN_PROGRESS"}))
         self.assertFalse(AuditUtils.is_archive_update(None))
 
     def test_insert_audit_row_executes_insert(self):
@@ -83,10 +83,10 @@ class TestAuditUtils(TestCase):
     def test_audit_update_diff_and_archive_paths(self, mock_insert):
         cur = MagicMock()
         before = {"request_id": 1, "status": "NOT_STARTED"}
-        after = {"request_id": 1, "status": "IN_PROGRESS"}
+        after = {"request_id": 1, "status": "DAT_IN_PROGRESS"}
         ctx = {"actor_user_id": 1}
 
-        AuditUtils.audit_update(cur, "requests", before, after, {"status": "IN_PROGRESS"}, ctx)
+        AuditUtils.audit_update(cur, "requests", before, after, {"status": "DAT_IN_PROGRESS"}, ctx)
         self.assertEqual(mock_insert.call_count, 1)
 
         AuditUtils.audit_update(cur, "requests", before, {"request_id": 1, "status": "ARCHIVED"}, {"status": "ARCHIVED"}, ctx)

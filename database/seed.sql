@@ -46,42 +46,52 @@ SELECT
 FROM generate_series(1, :CONTROLS) AS s(i);
 
 -- 3. REQUESTS
-INSERT INTO requests (requestor, description, start_date, due_date, complete_date, status, priority, created_by)
+INSERT INTO requests (requestor, description, start_date, due_date, status, priority, created_by)
 SELECT
   format('Requester %s', ((i - 1) % 10) + 1),
   format('Annual audit testing requirements for Request %s.', i),
   (current_date - ((i - 1) % 14))::date,
   (current_date + ((i - 1) % 21) + 7)::date,
-  CASE WHEN i % 5 = 0 THEN current_date::date ELSE NULL END,
-  CASE
-    WHEN i % 5 = 0 THEN 'COMPLETED'::request_status
-    WHEN i % 2 = 0 THEN 'IN_PROGRESS'::request_status
-    ELSE 'NOT_STARTED'::request_status
-  END,
-  -- Generate a random priority
+  'NOT_STARTED'::request_status,
   (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[FLOOR(RANDOM() * 4 + 1)],
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % :MANAGERS) LIMIT 1)
 FROM generate_series(1, :REQUESTS) AS s(i);
 
 -- 4. TESTS
-WITH test_data AS (
+WITH raw_test_flags AS (
   SELECT
-    -- Map Control N to a Request
     ((s.i - 1) % :REQUESTS) + 1 AS request_id,
-    
     s.i AS control_id,
-    
-    -- Assign Tester
     (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((s.i - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1) AS assigned_tester_id,
     
-    -- Requirements Logic
+    -- Generate booleans first
     CASE WHEN (s.i % 10) != 1 THEN TRUE ELSE FALSE END AS requires_dat,
     CASE WHEN (s.i % 10) != 0 THEN TRUE ELSE FALSE END AS requires_oet,
     
-    -- Generate the Macro Status and Priority FIRST so we can base logic on them
-    (ARRAY['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED']::test_status[])[(s.i % 4) + 1] AS macro_status,
-    (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[(s.i % 4) + 1] AS priority
+    (ARRAY['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']::request_priority[])[(s.i % 4) + 1] AS priority,
+    (s.i % 5) AS raw_status_index
   FROM generate_series(1, :CONTROLS) AS s(i)
+),
+test_data AS (
+  SELECT
+    request_id,
+    control_id,
+    assigned_tester_id,
+    requires_dat,
+    requires_oet,
+    priority,
+    
+    -- Smart Status Assignment: Skips phases that aren't required
+    CASE
+      WHEN raw_status_index = 0 THEN 'NOT_STARTED'::test_status
+      WHEN raw_status_index = 1 AND requires_dat THEN 'DAT_IN_PROGRESS'::test_status
+      WHEN raw_status_index = 1 AND NOT requires_dat THEN 'OET_IN_PROGRESS'::test_status
+      WHEN raw_status_index = 2 AND requires_oet THEN 'OET_IN_PROGRESS'::test_status
+      WHEN raw_status_index = 2 AND NOT requires_oet THEN 'IN_REVIEW'::test_status
+      WHEN raw_status_index = 3 THEN 'IN_REVIEW'::test_status
+      ELSE 'COMPLETED'::test_status
+    END AS macro_status
+  FROM raw_test_flags
 )
 INSERT INTO tests (
   request_id, control_id, assigned_tester_id, description,
@@ -96,18 +106,18 @@ SELECT
   requires_dat,
   requires_oet,
   
-  -- DAT STEP LOGIC (Strictly respects Macro Status)
+  -- DAT STEP LOGIC
   CASE 
     WHEN NOT requires_dat THEN NULL
     WHEN macro_status = 'NOT_STARTED' THEN NULL
-    WHEN macro_status IN ('IN_REVIEW', 'COMPLETED') THEN 'COMPLETED'::test_progress_step
+    WHEN macro_status IN ('OET_IN_PROGRESS', 'IN_REVIEW', 'COMPLETED') THEN 'COMPLETED'::test_progress_step
     ELSE (ARRAY['TESTING_READY', 'WALKTHROUGH_SCHEDULED', 'TESTING_IN_PROGRESS', 'ADDRESSING_COMMENTS']::test_progress_step[])[(control_id % 4) + 1]
   END AS dat_step,
   
-  -- OET STEP LOGIC (Strictly respects Macro Status)
+  -- OET STEP LOGIC
   CASE 
     WHEN NOT requires_oet THEN NULL
-    WHEN macro_status = 'NOT_STARTED' THEN NULL
+    WHEN macro_status IN ('NOT_STARTED', 'DAT_IN_PROGRESS') THEN NULL
     WHEN macro_status IN ('IN_REVIEW', 'COMPLETED') THEN 'COMPLETED'::test_progress_step
     ELSE (ARRAY['TESTING_READY', 'TESTING_IN_PROGRESS', 'ADDRESSING_COMMENTS']::test_progress_step[])[(control_id % 3) + 1]
   END AS oet_step,
@@ -115,7 +125,6 @@ SELECT
   macro_status AS status,
   priority,
 
-  -- DATE LOGIC (Strictly respects Macro Status)
   CASE WHEN macro_status != 'NOT_STARTED' THEN current_date - 5 ELSE NULL END AS start_date,
   current_date + 5 AS estimated_date,
   current_date + 10 AS due_date,
@@ -123,8 +132,23 @@ SELECT
 
 FROM test_data;
 
+-- 4b. UPDATE REQUEST STATUSES
+-- Now that tests are created, we evaluate the status of the requests 
+-- based on the completion of their tests.
+UPDATE requests r
+SET 
+  status = CASE
+    WHEN (SELECT count(*) FROM tests t WHERE t.request_id = r.request_id) = 0 THEN 'NOT_STARTED'::request_status
+    WHEN (SELECT count(*) FROM tests t WHERE t.request_id = r.request_id AND t.status != 'COMPLETED') = 0 THEN 'COMPLETED'::request_status
+    WHEN (SELECT count(*) FROM tests t WHERE t.request_id = r.request_id AND t.status != 'NOT_STARTED') > 0 THEN 'IN_PROGRESS'::request_status
+    ELSE 'NOT_STARTED'::request_status
+  END,
+  complete_date = CASE
+    WHEN (SELECT count(*) FROM tests t WHERE t.request_id = r.request_id AND t.status != 'COMPLETED') = 0 THEN current_date
+    ELSE NULL
+  END;
+
 -- 5. COMMENTS
--- 1 request-level comment per request
 INSERT INTO comments (author_user_id, request_id, test_id, comment_text)
 SELECT
   (SELECT user_id FROM users WHERE role='MANAGER'::user_role ORDER BY user_id OFFSET ((r.request_id - 1) % :MANAGERS) LIMIT 1),
@@ -133,8 +157,6 @@ SELECT
   format('Request %s created.  Status: %s', r.request_id, r.status)
 FROM requests r;
 
--- (COMMENTS_PER_REQUEST - 1) test-level comments per request (spread across tests)
--- Example: if COMMENTS_PER_REQUEST=2 => adds 1 extra comment per request.
 INSERT INTO comments (author_user_id, request_id, test_id, comment_text)
 SELECT
   (SELECT user_id FROM users WHERE role='TESTER'::user_role ORDER BY user_id OFFSET ((t.test_id - 1) % GREATEST(:USERS - :MANAGERS, 1)) LIMIT 1),

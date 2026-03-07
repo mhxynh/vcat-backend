@@ -50,7 +50,7 @@ class TestTestAuditUtils(TestCase):
     @patch("utils.test_audit.AuditUtils.insert_audit_row")
     def test_audit_soft_and_hard_delete(self, mock_insert):
         TestAuditUtils.set_context(actor_user_id=9)
-        before = {"test_id": 2, "status": "IN_PROGRESS"}
+        before = {"test_id": 2, "status": "OET_IN_PROGRESS"}
         after = {"test_id": 2, "status": "ARCHIVED"}
         TestAuditUtils.audit_soft_delete(MagicMock(), before, after)
         TestAuditUtils.audit_hard_delete(MagicMock(), before, {"test_id": 2})
