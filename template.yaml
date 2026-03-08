@@ -361,6 +361,9 @@ Resources:
           Properties:
             Path: /users
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         OptionsUsers:
           Type: Api
           Properties:
@@ -374,11 +377,17 @@ Resources:
           Properties:
             Path: /users/{id}
             Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         DeleteUser:
           Type: Api
           Properties:
             Path: /users/{id}
             Method: delete
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         OptionsUserById:
           Type: Api
           Properties:
