@@ -294,7 +294,11 @@ class TestRepository:
 
                     query = """
                         UPDATE tests
-                        SET status = 'IN_PROGRESS', start_date = COALESCE(start_date, current_date)
+                        SET status = CASE
+                                WHEN requires_dat THEN 'DAT_IN_PROGRESS'::test_status
+                                ELSE 'OET_IN_PROGRESS'::test_status
+                            END,
+                            start_date = COALESCE(start_date, current_date)
                         WHERE test_id = %s
                         RETURNING *;
                     """

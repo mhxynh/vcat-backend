@@ -10,7 +10,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE test_status AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
+    CREATE TYPE test_status AS ENUM ('NOT_STARTED', 'DAT_IN_PROGRESS', 'OET_IN_PROGRESS', 'IN_REVIEW', 'COMPLETED', 'BLOCKED', 'ARCHIVED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS requests (
 
 CREATE TABLE IF NOT EXISTS tests (
     test_id             BIGSERIAL PRIMARY KEY,
-    request_id          BIGINT NOT NULL REFERENCES requests(request_id) ON DELETE CASCADE,
+    request_id          BIGINT REFERENCES requests(request_id) ON DELETE CASCADE,
     control_id          BIGINT NOT NULL REFERENCES controls(control_id),
     requires_dat        BOOLEAN NOT NULL DEFAULT TRUE,
     requires_oet        BOOLEAN NOT NULL DEFAULT TRUE,

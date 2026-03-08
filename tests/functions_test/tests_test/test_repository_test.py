@@ -220,15 +220,15 @@ class TestTestRepository(TestCase):
     @patch('functions.tests.test_repository.DbUtils')
     def test_update_dat_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
-            {"test_id": 42, "dat_step": "Phase 2", "status": "IN_PROGRESS"}, fetchone=True
+            {"test_id": 42, "dat_step": "Phase 2", "status": "DAT_IN_PROGRESS"}, fetchone=True
         )
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = TestRepository.update_dat_track(42, "Phase 2", "IN_PROGRESS")
+        result = TestRepository.update_dat_track(42, "Phase 2", "DAT_IN_PROGRESS")
 
         args, _ = mock_cursor.execute.call_args
         self.assertIn("SET dat_step = %s, status = %s", args[0])
-        self.assertEqual(args[1], ("Phase 2", "IN_PROGRESS", 42))
+        self.assertEqual(args[1], ("Phase 2", "DAT_IN_PROGRESS", 42))
         mock_conn.commit.assert_called_once()
 
     @patch('functions.tests.test_repository.Logger')
@@ -236,21 +236,21 @@ class TestTestRepository(TestCase):
     def test_update_dat_track_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
         with self.assertRaises(Exception):
-            TestRepository.update_dat_track(42, "Phase 2", "IN_PROGRESS")
+            TestRepository.update_dat_track(42, "Phase 2", "DAT_IN_PROGRESS")
         mock_logger.log.assert_called_once()
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_update_oet_track_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection(
-            {"test_id": 42, "oet_step": "Step 1", "status": "IN_PROGRESS", "assigned_tester_name": "Alice"}, fetchone=True
+            {"test_id": 42, "oet_step": "Step 1", "status": "OET_IN_PROGRESS", "assigned_tester_name": "Alice"}, fetchone=True
         )
         mock_db.get_db_connection.return_value = mock_conn
 
-        result = TestRepository.update_oet_track(42, "Step 1", "IN_PROGRESS")
+        result = TestRepository.update_oet_track(42, "Step 1", "OET_IN_PROGRESS")
 
         args, _ = mock_cursor.execute.call_args
         self.assertIn("SET oet_step = %s, status = %s", args[0]) 
-        self.assertEqual(args[1], ("Step 1", "IN_PROGRESS", 42))
+        self.assertEqual(args[1], ("Step 1", "OET_IN_PROGRESS", 42))
         mock_conn.commit.assert_called_once()
 
     @patch('functions.tests.test_repository.Logger')
@@ -258,21 +258,22 @@ class TestTestRepository(TestCase):
     def test_update_oet_track_error(self, mock_db, mock_logger):
         mock_db.get_db_connection.side_effect = Exception("DB down")
         with self.assertRaises(Exception):
-            TestRepository.update_oet_track(42, "Step 1", "IN_PROGRESS")
+            TestRepository.update_oet_track(42, "Step 1", "OET_IN_PROGRESS")
         mock_logger.log.assert_called_once()
 
     @patch('functions.tests.test_repository.DbUtils')
     def test_start_test_success(self, mock_db):
-        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "IN_PROGRESS", "assigned_tester_name": "Alice"}, fetchone=True)
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "DAT_IN_PROGRESS", "assigned_tester_name": "Alice"}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
         result = TestRepository.start_test(42)
 
         args, _ = mock_cursor.execute.call_args
-        self.assertIn("SET status = 'IN_PROGRESS'", args[0])
+        self.assertIn("WHEN requires_dat THEN 'DAT_IN_PROGRESS'", args[0])
+        self.assertIn("ELSE 'OET_IN_PROGRESS'", args[0])
         self.assertEqual(args[1], (42,))
         mock_conn.commit.assert_called_once()
-        self.assertEqual(result["status"], "IN_PROGRESS")
+        self.assertEqual(result["status"], "DAT_IN_PROGRESS")
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -367,3 +368,163 @@ class TestTestRepository(TestCase):
         with self.assertRaises(Exception):
             TestRepository.hard_delete(42)
         mock_logger.log.assert_called_once()
+
+    # Not-found (None) return cases
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_get_tests_by_id_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.get_tests_by_id(9999)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_assigned_tester_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_assigned_tester(9999, 1)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_dat_track_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_dat_track(9999, "TESTING_READY", "DAT_IN_PROGRESS")
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_oet_track_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_oet_track(9999, "TESTING_READY", "OET_IN_PROGRESS")
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_start_test_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.start_test(9999)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_review_test_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.review_test(9999)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_complete_test_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.complete_test(9999)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_soft_delete_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.soft_delete(9999)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_hard_delete_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.hard_delete(9999)
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_create_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.create("VGCP-NONE", 1, "Desc", True, False, "2026-03-01")
+
+        self.assertIsNone(result)
+
+    # Audit context branch coverage
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_assigned_tester_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "assigned_tester_id": 500}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "assigned_tester_id": 100}
+
+        result = TestRepository.update_assigned_tester(42, 500)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        self.assertEqual(result["assigned_tester_id"], 500)
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_start_test_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "DAT_IN_PROGRESS"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "status": "NOT_STARTED"}
+
+        result = TestRepository.start_test(42)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_complete_test_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "COMPLETED"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "status": "IN_REVIEW"}
+
+        result = TestRepository.complete_test(42)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_soft_delete_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "ARCHIVED"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "status": "COMPLETED"}
+
+        result = TestRepository.soft_delete(42)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_soft_delete.assert_called_once()
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_hard_delete_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42}
+
+        result = TestRepository.hard_delete(42)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_hard_delete.assert_called_once()
