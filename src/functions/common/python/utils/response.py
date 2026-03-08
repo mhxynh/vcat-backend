@@ -10,6 +10,18 @@ class ResponseUtils:
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
     @staticmethod
+    def cors_preflight():
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET,PUT,DELETE",
+            },
+            "body": "",
+        }
+
+    @staticmethod
     def http_response(status_code, payload):
         return {
             "statusCode": status_code,

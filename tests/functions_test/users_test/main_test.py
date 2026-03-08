@@ -5,6 +5,13 @@ import functions.users.main as users
 
 
 class TestUsersMain(TestCase):
+    def setUp(self):
+        self.auth_patcher = patch('functions.users.main.AuthUtils')
+        self.mock_auth = self.auth_patcher.start()
+
+    def tearDown(self):
+        self.auth_patcher.stop()
+
     def _build_event(self, method, path, path_params=None, query_params=None):
         event = {
             "httpMethod": method,

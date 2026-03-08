@@ -7,6 +7,9 @@ from utils.auth_utils import AuthUtils
 
 
 def lambda_handler(event, context):
+    if event.get("httpMethod") == "OPTIONS":
+        return ResponseUtils.cors_preflight()
+
     Logger.start()
 
     if len(event) == 0:
