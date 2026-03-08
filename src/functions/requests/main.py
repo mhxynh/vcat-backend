@@ -3,6 +3,7 @@ from constants.common_variables import TableNames, Methods, StatusCodes, LogLeve
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
+from utils.auth_utils import AuthUtils
 
 
 def lambda_handler(event, context):
@@ -44,6 +45,10 @@ def lambda_handler(event, context):
 
         # POST /requests : create a new request (DML: priority, requestor, due_date, description, created_by)
         if method == Methods.POST:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized request creation attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+
             body = json.loads(event.get("body", "{}"))
             required_fields = ["requestor", "due_date", "priority", "created_by"]
             missing = [field for field in required_fields if field not in body]
@@ -66,6 +71,10 @@ def lambda_handler(event, context):
 
         # PUT /requests/{id} : update request
         if method == Methods.PUT:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized request update attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+    
             req_id = ResponseUtils.extract_id(event, normalized_path, TableNames.REQUESTS)
             if req_id is None:
                 Logger.log(level=LogLevels.ERROR, message="Request ID not provided in path for update")
@@ -92,6 +101,10 @@ def lambda_handler(event, context):
 
         # DELETE /requests/{id} : Archive or Hard Delete a request
         if method == Methods.DELETE:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized request deletion attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+
             req_id = ResponseUtils.extract_id(event, normalized_path, TableNames.REQUESTS)
             if req_id is None:
                 Logger.log(level=LogLevels.ERROR, message="Request ID not provided in path for delete")

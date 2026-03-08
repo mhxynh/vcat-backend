@@ -2,7 +2,7 @@ from constants.common_variables import TableNames, Methods, StatusCodes, LogLeve
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
-
+from utils.auth_utils import AuthUtils
 
 def lambda_handler(event, context):
     Logger.start()
@@ -63,6 +63,10 @@ def lambda_handler(event, context):
 
         # DELETE /users/{id} : Deactivate user
         if method == Methods.DELETE:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized user deactivation attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+            
             user_id = ResponseUtils.extract_id(event, normalized_path, TableNames.USERS)
             if user_id is None:
                 Logger.log(level=LogLevels.ERROR, message="User ID not provided in path for delete")
