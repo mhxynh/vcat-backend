@@ -38,14 +38,14 @@ Parameters:
 
 Resources:
   VcatApi:
-  Type: AWS::Serverless::Api
-  Properties:
-    StageName: Prod
-    Auth:
-      DefaultAuthorizer: MyCognitoAuthorizer
-      Authorizers:
-        MyCognitoAuthorizer:
-          UserPoolArn: !GetAtt MyUserPool.Arn
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: MyCognitoAuthorizer
+        Authorizers:
+          MyCognitoAuthorizer:
+            UserPoolArn: !GetAtt MyUserPool.Arn
 
   CommonDependencyLayer:
     Type: AWS::Serverless::LayerVersion
