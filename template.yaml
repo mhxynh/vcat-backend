@@ -30,6 +30,9 @@ Parameters:
   dbPasswordParam:
     Type: String
     NoEcho: true
+  UserPoolArnPath:
+    Type: "AWS::SSM::Parameter::Value<String>"
+    Default: "/vcat/prod/cognito/user-pool-arn"
 
 Resources:
   VcatApi:
@@ -45,7 +48,7 @@ Resources:
         AddDefaultAuthorizerToCorsPreflight: false
         Authorizers:
           MyCognitoAuthorizer:
-            UserPoolArn: !GetAtt MyUserPool.Arn
+            UserPoolArn: !Ref UserPoolArnPath
 
   CommonDependencyLayer:
     Type: AWS::Serverless::LayerVersion
