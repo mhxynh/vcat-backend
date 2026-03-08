@@ -14,7 +14,12 @@ class ResponseUtils:
         return {
             "statusCode": status_code,
             "body": json.dumps(payload, default=ResponseUtils.default_serializer),
-            "headers": {"Content-Type": "application/json"},
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Methods": "OPTIONS,POST,GET,PUT,DELETE",
+            },
         }
     
     @staticmethod
@@ -33,4 +38,51 @@ class ResponseUtils:
         parts = (path or "").strip("/").split("/")
         if len(parts) >= 2 and parts[0] == resource:
             return parts[1]
+        return None
+
+    @staticmethod
+    def get_query_params(event):
+        return event.get("queryStringParameters") or {}
+
+    @staticmethod
+    def get_json_body(event):
+        raw_body = event.get("body") if event else None
+        if not raw_body:
+            return {}
+        if isinstance(raw_body, dict):
+            return raw_body
+        try:
+            return json.loads(raw_body)
+        except Exception:
+            return {}
+
+    @staticmethod
+    def get_actor_user_id(event, body=None):
+        request_context = event.get("requestContext", {}) if event else {}
+        authorizer = request_context.get("authorizer", {}) if request_context else {}
+        headers = event.get("headers", {}) or {}
+        params = event.get("queryStringParameters", {}) or {}
+        payload = body or {}
+
+        candidates = [
+            authorizer.get("user_id"),
+            authorizer.get("principalId"),
+            (authorizer.get("claims", {}) or {}).get("sub"),
+            (authorizer.get("claims", {}) or {}).get("custom:user_id"),
+            headers.get("x-user-id"),
+            headers.get("X-User-Id"),
+            headers.get("x-actor-user-id"),
+            headers.get("X-Actor-User-Id"),
+            params.get("actor_user_id"),
+            payload.get("actor_user_id"),
+            payload.get("created_by"),
+        ]
+
+        for candidate in candidates:
+            if candidate is None or candidate == "":
+                continue
+            try:
+                return int(candidate)
+            except (ValueError, TypeError):
+                continue
         return None

@@ -13,6 +13,11 @@ def lambda_handler(event, context):
         return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
 
     try:
+        body_for_context = ResponseUtils.get_json_body(event)
+        TestRepository.set_audit_context(
+            actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
+        )
+
         method, normalized_path = ResponseUtils.get_method_and_path(event)
         test_id = ResponseUtils.extract_id(event, normalized_path, TableNames.TESTS)
     
@@ -100,6 +105,18 @@ def lambda_handler(event, context):
                 updated_record = TestRepository.review_test(test_id)
             elif action == "complete":
                 updated_record = TestRepository.complete_test(test_id)
+            elif action == "update_details":
+                updated_record = TestRepository.update_details(
+                    test_id,
+                    body.get("vgcpid"),
+                    body.get("request_id"),
+                    body.get("assigned_tester_id"),
+                    body.get("requires_dat"),
+                    body.get("requires_oet"),
+                    body.get("due_date"),
+                    body.get("estimated_date"),
+                    body.get("description")
+                )
             else:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Invalid or missing action"})
 
@@ -147,3 +164,5 @@ def lambda_handler(event, context):
         # Default Fallback
         Logger.log(level=LogLevels.ERROR, message="Error in tests handler", extra_fields={"exception": error_message})
         return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": error_message})
+    finally:
+        TestRepository.clear_audit_context()

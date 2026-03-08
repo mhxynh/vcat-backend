@@ -5,6 +5,7 @@ from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 
+
 def lambda_handler(event, context):
     method = event.get("httpMethod")
 
@@ -20,6 +21,11 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Controls Function Started")
 
     try:
+        body_for_context = ResponseUtils.get_json_body(event)
+        CrudUtils.set_audit_context(
+            actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
+        )
+
         method, path = ResponseUtils.get_method_and_path(event)
         normalized_path = (path or "").rstrip("/")
         method = (method or "").upper()
@@ -82,7 +88,7 @@ def lambda_handler(event, context):
                 Logger.log(level=LogLevels.ERROR, message="No update data provided")
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No update data provided"})
 
-            allowed_fields = ["description", "control_owner", "control_sme", "escalation", "last_tested"]
+            allowed_fields = ["vgcpid", "description", "control_owner", "control_sme", "escalation", "last_tested"]
             updates = {field: value for field, value in body.items() if field in allowed_fields}
 
             if not updates:
@@ -134,3 +140,5 @@ def lambda_handler(event, context):
     except Exception as e:
         Logger.log(level=LogLevels.ERROR, message="Error in controls handler", extra_fields={"exception": str(e)})
         return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)})
+    finally:
+        CrudUtils.clear_audit_context()
