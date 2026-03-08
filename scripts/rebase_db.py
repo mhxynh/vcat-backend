@@ -23,13 +23,13 @@ def run_rebase():
     db_port = os.getenv("DB_PORT", "5432")
 
     if not db_password:
-        print("❌ Error: DB_PASSWORD environment variable is not set.")
+        print("Error: DB_PASSWORD environment variable is not set.")
         return
 
     target_db_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     admin_db_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/postgres"
 
-    print(f"⚠️  WARNING: This will completely WIPE the '{db_name}' database.")
+    print(f"WARNING: This will completely WIPE the '{db_name}' database.")
     if input("Are you sure you want to continue? (type 'y' to proceed): ").lower() != 'y':
         print("Rebase canceled.")
         return
@@ -50,11 +50,11 @@ def run_rebase():
         print(f"Seeding data from {SEED_PATH.name}...")
         run_psql(target_db_url, ["-f", str(SEED_PATH)])
 
-        print("\n✅ Database rebase complete! Your local database is fresh and ready to go.")
+        print("\nDatabase rebase complete! Your local database is fresh and ready to go.")
     except subprocess.TimeoutExpired:
-        print("\n❌ Error: The database connection timed out again! Look at the text directly above this line to see what psql was waiting for.")
+        print("\nError: The database connection timed out. Look at the text directly above this line to see what psql was waiting for.")
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ Error during rebase. Process exited with code {e.returncode}")
+        print(f"\nError during rebase. Process exited with code {e.returncode}")
 
 if __name__ == "__main__":
     run_rebase()
