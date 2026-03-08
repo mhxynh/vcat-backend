@@ -9,6 +9,9 @@ from utils.auth_utils import AuthUtils
 def lambda_handler(event, context):
     method = event.get("httpMethod")
 
+    if method == "OPTIONS":
+        return ResponseUtils.cors_preflight()
+
     if method == "POST" and not AuthUtils.is_tester(event):
         return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Tester access required"})
     
@@ -78,6 +81,10 @@ def lambda_handler(event, context):
 
         # PUT /controls/{vgcpid} : Update an existing control by vgcpid
         if method == Methods.PUT:
+            if not AuthUtils.is_manager(event):
+                Logger.log(level=LogLevels.WARNING, message="Unauthorized control update attempt")
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
+            
             vgcpid = ResponseUtils.extract_id(event, normalized_path, TableNames.CONTROLS)
             if vgcpid is None:
                 Logger.log(level=LogLevels.ERROR, message="VGCPID not provided in path")

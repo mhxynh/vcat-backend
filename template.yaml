@@ -42,6 +42,7 @@ Resources:
         AllowOrigin: "'*'"
       Auth:
         DefaultAuthorizer: MyCognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
         Authorizers:
           MyCognitoAuthorizer:
             UserPoolArn: !GetAtt MyUserPool.Arn
@@ -105,6 +106,22 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        OptionsControls:
+          Type: Api
+          Properties:
+            Path: /controls
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
+        OptionsControlById:
+          Type: Api
+          Properties:
+            Path: /controls/{id}
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   TestsFunction:
     Type: AWS::Serverless::Function
@@ -154,6 +171,22 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        OptionsTests:
+          Type: Api
+          Properties:
+            Path: /tests
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
+        OptionsTestById:
+          Type: Api
+          Properties:
+            Path: /tests/{test_id}
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   RequestsFunction:
     Type: AWS::Serverless::Function
@@ -203,6 +236,22 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        OptionsRequests:
+          Type: Api
+          Properties:
+            Path: /requests
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
+        OptionsRequestById:
+          Type: Api
+          Properties:
+            Path: /requests/{id}
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   CommentsFunction:
     Type: AWS::Serverless::Function
@@ -237,6 +286,14 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        OptionsAudit:
+          Type: Api
+          Properties:
+            Path: /audit
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   ExportFunction:
     Type: AWS::Serverless::Function
@@ -254,6 +311,14 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        OptionsExport:
+          Type: Api
+          Properties:
+            Path: /export
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   NotificationsFunction:
     Type: AWS::Serverless::Function
@@ -271,6 +336,14 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        OptionsNotifications:
+          Type: Api
+          Properties:
+            Path: /notifications
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   UserFunction:
     Type: AWS::Serverless::Function
@@ -285,6 +358,14 @@ Resources:
           Properties:
             Path: /users
             Method: get
+        OptionsUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
         GetUserById:
           Type: Api
           Properties:
@@ -295,6 +376,14 @@ Resources:
           Properties:
             Path: /users/{id}
             Method: delete
+        OptionsUserById:
+          Type: Api
+          Properties:
+            Path: /users/{id}
+            Method: options
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: NONE
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group

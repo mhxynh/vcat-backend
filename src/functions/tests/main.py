@@ -6,6 +6,9 @@ from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 
 def lambda_handler(event, context):
+    if event and event.get("httpMethod") == "OPTIONS":
+        return ResponseUtils.cors_preflight()
+
     Logger.start()
 
     if not event:
@@ -79,9 +82,9 @@ def lambda_handler(event, context):
 
         # PUT /tests/{test_id}
         if method == Methods.PUT:
-            if not AuthUtils.is_tester(event):
+            if not (AuthUtils.is_manager(event) or AuthUtils.is_tester(event)):
                 Logger.log(level=LogLevels.WARNING, message="Unauthorized test update attempt")
-                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Tester access required"})
+                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager or Tester access required"})
 
             if not test_id:
                 return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "Test ID required for update"})
