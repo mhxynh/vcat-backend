@@ -32,9 +32,9 @@ class TestAuditMain(TestCase):
         self.assertEqual(rows, [{"audit_id": 1}])
         sql = mock_cur.execute.call_args[0][0]
         values = mock_cur.execute.call_args[0][1]
-        self.assertIn("entity_type = %s", sql)
-        self.assertIn("entity_id = %s", sql)
-        self.assertIn("actor_user_id = %s", sql)
+        self.assertIn("al.entity_type = %s", sql)
+        self.assertIn("al.entity_id = %s", sql)
+        self.assertIn("al.actor_user_id = %s", sql)
         self.assertEqual(values[0], "CONTROL")
         mock_conn.close.assert_called_once()
 

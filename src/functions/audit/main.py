@@ -17,33 +17,65 @@ def to_positive_int(raw_value, default_value, minimum=1, maximum=1000):
         return default_value
 
 
+def build_audit_query(request_id=None, entity_type=None, entity_id=None, actor_user_id=None):
+    """Build SQL and values for audit log fetch.
+    Uses LEFT JOIN for vgcpid (single pass) instead of correlated subquery (N passes).
+    Caller appends limit and offset to values.
+    """
+    base_sql = """
+        SELECT al.*, c.vgcpid
+        FROM audit_logs al
+        LEFT JOIN tests t ON al.entity_type = 'TEST' AND al.entity_id = t.test_id
+        LEFT JOIN controls c ON t.control_id = c.control_id
+    """
+    where = []
+    values = []
+
+    if request_id:
+        where.append(
+            "(al.entity_type = 'REQUEST' AND al.entity_id = %s) "
+            "OR (al.entity_type = 'TEST' AND al.entity_id IN (SELECT test_id FROM tests WHERE request_id = %s))"
+        )
+        values.extend([request_id, request_id])
+    else:
+        if entity_type:
+            where.append("al.entity_type = %s")
+            values.append(entity_type.upper())
+        if entity_id:
+            where.append("al.entity_id = %s")
+            values.append(entity_id)
+        if actor_user_id:
+            where.append("al.actor_user_id = %s")
+            values.append(actor_user_id)
+
+    sql = base_sql
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY al.changed_at DESC LIMIT %s OFFSET %s"
+    return sql, values
+
+
 def get_audit_logs(params):
-    """Fetch audit logs with optional filters. entity_id filters by the audited entity's ID."""
+    """Fetch audit logs with optional filters.
+    - request_id: return logs for the request + all tests under that request (for request history view).
+    - entity_type/entity_id: filter by single entity.
+    Uses LEFT JOIN for vgcpid lookup (efficient single pass vs correlated subquery).
+    """
     conn = DbUtils.get_db_connection()
     try:
+        request_id = params.get("request_id")
         entity_type = params.get("entity_type")
         entity_id = params.get("entity_id")
         actor_user_id = params.get("actor_user_id")
         limit = to_positive_int(params.get("limit"), 100, minimum=1, maximum=500)
         offset = to_positive_int(params.get("offset"), 0, minimum=0, maximum=100000)
 
-        where = []
-        values = []
-
-        if entity_type:
-            where.append("entity_type = %s")
-            values.append(entity_type.upper())
-        if entity_id:
-            where.append("entity_id = %s")
-            values.append(entity_id)
-        if actor_user_id:
-            where.append("actor_user_id = %s")
-            values.append(actor_user_id)
-
-        sql = "SELECT * FROM audit_logs"
-        if where:
-            sql += " WHERE " + " AND ".join(where)
-        sql += " ORDER BY changed_at DESC LIMIT %s OFFSET %s"
+        sql, values = build_audit_query(
+            request_id=request_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            actor_user_id=actor_user_id,
+        )
         values.extend([limit, offset])
 
         with conn.cursor() as cur:
