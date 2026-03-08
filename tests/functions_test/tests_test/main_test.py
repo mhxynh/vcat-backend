@@ -4,6 +4,13 @@ from unittest.mock import patch
 import functions.tests.main as tests_main
 
 class TestTestsMain(TestCase):
+    def setUp(self):
+        self.auth_patcher = patch('functions.tests.main.AuthUtils')
+        self.mock_auth = self.auth_patcher.start()
+
+    def tearDown(self):
+        self.auth_patcher.stop()
+
     def _build_event(self, method, path, body=None, path_params=None, query_params=None):
         event = {
             "httpMethod": method,

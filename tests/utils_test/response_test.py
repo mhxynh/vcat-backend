@@ -29,7 +29,7 @@ class TestResponseUtils(TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(response["headers"]["Content-Type"], "application/json")
         self.assertEqual(response["headers"]["Access-Control-Allow-Origin"], "*")
-        self.assertEqual(response["headers"]["Access-Control-Allow-Headers"], "Content-Type")
+        self.assertEqual(response["headers"]["Access-Control-Allow-Headers"], "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token")
         self.assertEqual(response["headers"]["Access-Control-Allow-Methods"], "OPTIONS,POST,GET,PUT,DELETE")
         self.assertEqual(json.loads(response["body"]), payload)
 
