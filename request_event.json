@@ -2,7 +2,8 @@
   "requestContext": {
     "authorizer": {
       "claims": {
-        "cognito:groups": "Developers"
+        "cognito:groups": "Managers, Testers",
+        "email": "monique.huynh@vanguard.com"
       }
     }
   }
