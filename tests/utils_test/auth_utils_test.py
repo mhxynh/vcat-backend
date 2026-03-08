@@ -15,8 +15,8 @@ class TestAuthUtils(TestCase):
             }
         }
 
-    # get_user_claims
-    
+    # Get User Claims
+
     def test_get_user_claims_returns_claims(self):
         event = self._build_event("Manager")
         claims = AuthUtils.get_user_claims(event)
@@ -26,7 +26,7 @@ class TestAuthUtils(TestCase):
         claims = AuthUtils.get_user_claims({})
         self.assertEqual(claims, {})
 
-    # get_user_groups
+    # Get User Groups
 
     def test_get_user_groups_single(self):
         event = self._build_event("Manager")
@@ -44,7 +44,7 @@ class TestAuthUtils(TestCase):
         event = {"requestContext": {"authorizer": {"claims": {"cognito:groups": ["Admin"]}}}}
         self.assertEqual(AuthUtils.get_user_groups(event), ["Admin"])
 
-    # is_manager / is_tester
+    # Checks for Manager and Tester groups
 
     def test_is_manager_true(self):
         self.assertTrue(AuthUtils.is_manager(self._build_event("Manager")))
@@ -58,7 +58,7 @@ class TestAuthUtils(TestCase):
     def test_is_tester_false(self):
         self.assertFalse(AuthUtils.is_tester(self._build_event("Manager")))
 
-    # require_manager decorator
+    # Require Manager decorator
 
     def test_require_manager_allows_manager(self):
         @require_manager
@@ -77,7 +77,7 @@ class TestAuthUtils(TestCase):
         self.assertEqual(result["statusCode"], 403)
         self.assertIn("Manager access required", json.loads(result["body"])["error"])
 
-    # require_tester decorator
+    # Require Tester decorator
 
     def test_require_tester_allows_tester(self):
         @require_tester
