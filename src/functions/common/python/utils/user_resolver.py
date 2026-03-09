@@ -22,9 +22,24 @@ class UserResolver:
         """
         claims = AuthUtils.get_user_claims(event)
         cognito_sub = claims.get("sub")
-        email = claims.get("email")
+        email = (
+            claims.get("email")
+            or claims.get("cognito:email")
+            or claims.get("preferred_username")
+        )
+
+        Logger.log(
+            level="INFO",
+            message="UserResolver: extracted claims",
+            extra_fields={
+                "cognito_sub": cognito_sub,
+                "email": email,
+                "claim_keys": list(claims.keys()) if claims else [],
+            },
+        )
 
         if not cognito_sub and not email:
+            Logger.log(level="WARNING", message="UserResolver: no sub or email in claims")
             return None
 
         conn = DbUtils.get_db_connection()
@@ -60,6 +75,11 @@ class UserResolver:
                 if email:
                     role = UserResolver._resolve_role(event)
                     display_name = UserResolver._resolve_display_name(claims, email)
+                    Logger.log(
+                        level="INFO",
+                        message="UserResolver: auto-provisioning new user",
+                        extra_fields={"email": email, "role": role, "display_name": display_name},
+                    )
                     cur.execute(
                         """
                         INSERT INTO users (cognito_sub, email, role, display_name)
@@ -82,7 +102,7 @@ class UserResolver:
             Logger.log(
                 level="ERROR",
                 message="Error resolving user",
-                extra_fields={"error": str(e)},
+                extra_fields={"error": str(e), "cognito_sub": cognito_sub, "email": email},
             )
             return None
         finally:
