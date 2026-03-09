@@ -68,8 +68,8 @@ class UserResolver:
                         """,
                         (cognito_sub, email, role, display_name),
                     )
-                    conn.commit()
                     user_id = cur.fetchone()["user_id"]
+                    conn.commit()
                     Logger.log(
                         level="INFO",
                         message="Auto-provisioned user from Cognito",
