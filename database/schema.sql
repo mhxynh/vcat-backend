@@ -54,6 +54,7 @@ $$ language 'plpgsql';
 ---------- TABLES ----------
 CREATE TABLE IF NOT EXISTS users (
     user_id         BIGSERIAL PRIMARY KEY,
+    cognito_sub     VARCHAR(255) UNIQUE,
     email           VARCHAR(255) UNIQUE NOT NULL,
     role            user_role NOT NULL,
     display_name    TEXT NOT NULL,
@@ -152,5 +153,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_changed_at ON audit_logs(changed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_action_changed_at ON audit_logs(action, changed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_entity_changed_at ON audit_logs(entity_type, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_cognito_sub ON users(cognito_sub);
 
 COMMIT;
