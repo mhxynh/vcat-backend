@@ -4,6 +4,7 @@ from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
+from utils.user_resolver import UserResolver
 
 def lambda_handler(event, context):
     if event and event.get("httpMethod") == "OPTIONS":
@@ -16,9 +17,8 @@ def lambda_handler(event, context):
         return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
 
     try:
-        body_for_context = ResponseUtils.get_json_body(event)
         TestRepository.set_audit_context(
-            actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
+            actor_user_id=UserResolver.resolve(event),
         )
 
         method, normalized_path = ResponseUtils.get_method_and_path(event)

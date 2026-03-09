@@ -41,6 +41,7 @@ class AuditUtils:
             "id_column": "user_id",
             "fields": [
                 "user_id",
+                "cognito_sub",
                 "email",
                 "role",
                 "display_name",

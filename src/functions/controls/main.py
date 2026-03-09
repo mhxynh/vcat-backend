@@ -4,6 +4,7 @@ from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
+from utils.user_resolver import UserResolver
 
 
 def lambda_handler(event, context):
@@ -24,9 +25,8 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Controls Function Started")
 
     try:
-        body_for_context = ResponseUtils.get_json_body(event)
         CrudUtils.set_audit_context(
-            actor_user_id=ResponseUtils.get_actor_user_id(event, body=body_for_context),
+            actor_user_id=UserResolver.resolve(event),
         )
 
         method, path = ResponseUtils.get_method_and_path(event)
