@@ -23,8 +23,9 @@ def build_audit_query(request_id=None, entity_type=None, entity_id=None, actor_u
     Caller appends limit and offset to values.
     """
     base_sql = """
-        SELECT al.*, c.vgcpid
+        SELECT al.*, c.vgcpid, u.display_name AS actor_display_name
         FROM audit_logs al
+        LEFT JOIN users u ON al.actor_user_id = u.user_id
         LEFT JOIN tests t ON al.entity_type = 'TEST' AND al.entity_id = t.test_id
         LEFT JOIN controls c ON t.control_id = c.control_id
     """
