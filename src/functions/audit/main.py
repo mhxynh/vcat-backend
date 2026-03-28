@@ -17,7 +17,9 @@ def to_positive_int(raw_value, default_value, minimum=1, maximum=1000):
         return default_value
 
 
-def build_audit_query(request_id=None, entity_type=None, entity_id=None, actor_user_id=None):
+def build_audit_query(
+    request_id=None, entity_type=None, entity_id=None, actor_user_id=None
+):
     """Build SQL and values for audit log fetch.
     Uses LEFT JOIN for vgcpid (single pass) instead of correlated subquery (N passes).
     Caller appends limit and offset to values.
@@ -35,7 +37,8 @@ def build_audit_query(request_id=None, entity_type=None, entity_id=None, actor_u
     if request_id:
         where.append(
             "(al.entity_type = 'REQUEST' AND al.entity_id = %s) "
-            "OR (al.entity_type = 'TEST' AND al.entity_id IN (SELECT test_id FROM tests WHERE request_id = %s))"
+            "OR (al.entity_type = 'TEST' AND al.entity_id IN"
+            "(SELECT test_id FROM tests WHERE request_id = %s))"
         )
         values.extend([request_id, request_id])
     else:
@@ -57,10 +60,10 @@ def build_audit_query(request_id=None, entity_type=None, entity_id=None, actor_u
 
 
 def get_audit_logs(params):
-    """Fetch audit logs with optional filters.
-    - request_id: return logs for the request + all tests under that request (for request history view).
-    - entity_type/entity_id: filter by single entity.
-    Uses LEFT JOIN for vgcpid lookup (efficient single pass vs correlated subquery).
+    """Fetch audit logs with optional filters
+    - request_id: return logs for the request + all tests under that request
+    - entity_type/entity_id: filter by single entity
+    Uses LEFT JOIN for vgcpid lookup (efficient single pass vs correlated subquery)
     """
     conn = DbUtils.get_db_connection()
     try:
@@ -127,7 +130,9 @@ def lambda_handler(event, context):
 
     if len(event) == 0:
         Logger.log(level=LogLevels.ERROR, message="No event data provided")
-        return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
+        return ResponseUtils.http_response(
+            StatusCodes.BAD_REQUEST, {"error": "No event data provided"}
+        )
 
     Logger.log(level=LogLevels.INFO, message="Audit Function Started")
 
@@ -135,17 +140,29 @@ def lambda_handler(event, context):
         method, _ = ResponseUtils.get_method_and_path(event)
         method = (method or "").upper()
         if method != Methods.GET:
-            return ResponseUtils.http_response(StatusCodes.METHOD_NOT_ALLOWED, {"error": "Method not allowed"})
+            return ResponseUtils.http_response(
+                StatusCodes.METHOD_NOT_ALLOWED, {"error": "Method not allowed"}
+            )
 
         params = ResponseUtils.get_query_params(event)
         view = (params.get("view") or "logs").lower()
 
         if view == "metrics":
             metrics = get_daily_metrics(params)
-            return ResponseUtils.http_response(StatusCodes.OK, {"view": "metrics", "data": metrics})
+            return ResponseUtils.http_response(
+                StatusCodes.OK, {"view": "metrics", "data": metrics}
+            )
 
         logs = get_audit_logs(params)
-        return ResponseUtils.http_response(StatusCodes.OK, {"view": "logs", "data": logs, "count": len(logs)})
+        return ResponseUtils.http_response(
+            StatusCodes.OK, {"view": "logs", "data": logs, "count": len(logs)}
+        )
     except Exception as e:
-        Logger.log(level=LogLevels.ERROR, message="Error in audit handler", extra_fields={"exception": str(e)})
-        return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)})
+        Logger.log(
+            level=LogLevels.ERROR,
+            message="Error in audit handler",
+            extra_fields={"exception": str(e)},
+        )
+        return ResponseUtils.http_response(
+            StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)}
+        )

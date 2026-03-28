@@ -120,7 +120,10 @@ class AuditUtils:
         if AuditUtils.snapshot_size_bytes(payload) <= max_payload_bytes:
             return payload, False
 
-        truncated = {"truncated": True, "note": f"Payload exceeded {max_payload_bytes} bytes"}
+        truncated = {
+            "truncated": True,
+            "note": f"Payload exceeded {max_payload_bytes} bytes",
+        }
         return truncated, True
 
     @staticmethod
@@ -160,11 +163,17 @@ class AuditUtils:
         changed_fields=None,
         max_payload_bytes=DEFAULT_MAX_PAYLOAD_BYTES,
     ):
-        before_payload, _ = AuditUtils.truncate_payload(before_snapshot, max_payload_bytes=max_payload_bytes)
-        after_payload, _ = AuditUtils.truncate_payload(after_snapshot, max_payload_bytes=max_payload_bytes)
+        before_payload, _ = AuditUtils.truncate_payload(
+            before_snapshot, max_payload_bytes=max_payload_bytes
+        )
+        after_payload, _ = AuditUtils.truncate_payload(
+            after_snapshot, max_payload_bytes=max_payload_bytes
+        )
         before_payload = AuditUtils.to_json_safe(before_payload)
         after_payload = AuditUtils.to_json_safe(after_payload)
-        payload_size_bytes = AuditUtils.snapshot_size_bytes(before_payload) + AuditUtils.snapshot_size_bytes(after_payload)
+        payload_size_bytes = AuditUtils.snapshot_size_bytes(
+            before_payload
+        ) + AuditUtils.snapshot_size_bytes(after_payload)
 
         cur.execute(
             """
@@ -219,7 +228,9 @@ class AuditUtils:
         if not config or not context or not after_row:
             return
 
-        before_snapshot = AuditUtils.snapshot_for_table(table, before_row) if before_row else None
+        before_snapshot = (
+            AuditUtils.snapshot_for_table(table, before_row) if before_row else None
+        )
         after_snapshot = AuditUtils.snapshot_for_table(table, after_row)
         diff = AuditUtils.build_diff(before_snapshot or {}, after_snapshot or {})
         if not diff and not AuditUtils.is_archive_update(updates):
@@ -249,12 +260,16 @@ class AuditUtils:
         )
 
     @staticmethod
-    def audit_delete(cur, table, before_row, deleted_row, context, is_soft_delete=False):
+    def audit_delete(
+        cur, table, before_row, deleted_row, context, is_soft_delete=False
+    ):
         config = AuditUtils.get_table_audit_config(table)
         if not config or not context or not deleted_row:
             return
 
-        before_snapshot = AuditUtils.snapshot_for_table(table, before_row) if before_row else None
+        before_snapshot = (
+            AuditUtils.snapshot_for_table(table, before_row) if before_row else None
+        )
         if is_soft_delete:
             after_snapshot = {"is_active": False}
             changed_fields = ["is_active"]

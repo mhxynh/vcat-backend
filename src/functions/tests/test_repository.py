@@ -1,8 +1,7 @@
-import json
-
 from utils.db_utils import DbUtils
 from utils.logger import Logger
 from utils.test_audit import TestAuditUtils
+
 
 class TestRepository:
     @staticmethod
@@ -32,12 +31,16 @@ class TestRepository:
                 cur.execute(query)
                 return [dict(row) for row in cur.fetchall()]
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching all tests", extra_fields={"error": str(e)})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching all tests",
+                extra_fields={"error": str(e)},
+            )
             raise e
         finally:
             if conn:
                 conn.close()
-    
+
     @staticmethod
     def get_tests_by_id(test_id):
         try:
@@ -56,7 +59,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching test by ID", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching test by ID",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
 
     @staticmethod
@@ -77,7 +84,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching tests by request ID", extra_fields={"error": str(e), "request_id": request_id})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching tests by request ID",
+                extra_fields={"error": str(e), "request_id": request_id},
+            )
             raise e
 
     @staticmethod
@@ -99,7 +110,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching detailled tests by request", extra_fields={"error": str(e), "request_id": request_id})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching detailled tests by request",
+                extra_fields={"error": str(e), "request_id": request_id},
+            )
             raise e
 
     @staticmethod
@@ -120,11 +135,24 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching tests by control ID", extra_fields={"error": str(e), "control_id": control_id})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching tests by control ID",
+                extra_fields={"error": str(e), "control_id": control_id},
+            )
             raise e
 
     @staticmethod
-    def create(vgcpid, request_id, description, requires_dat, requires_oet, due_date, assigned_tester_id=None, estimated_date=None):
+    def create(
+        vgcpid,
+        request_id,
+        description,
+        requires_dat,
+        requires_oet,
+        due_date,
+        assigned_tester_id=None,
+        estimated_date=None,
+    ):
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -141,17 +169,29 @@ class TestRepository:
                             description
                         ) VALUES (
                             (SELECT control_id FROM controls WHERE vgcpid = %s),
-                            %s, 
-                            %s, 
-                            %s, 
-                            %s, 
-                            %s, 
-                            %s, 
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            %s,
                             %s
                         )
                         RETURNING *;
                     """
-                    cur.execute(query, (vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description))
+                    cur.execute(
+                        query,
+                        (
+                            vgcpid,
+                            request_id,
+                            assigned_tester_id,
+                            requires_dat,
+                            requires_oet,
+                            due_date,
+                            estimated_date,
+                            description,
+                        ),
+                    )
                     row = cur.fetchone()
                     created = dict(row) if row else None
                     TestAuditUtils.audit_create(cur, created)
@@ -160,11 +200,25 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error creating test", extra_fields={"error": str(e), "vgcpid": vgcpid})
+            Logger.log(
+                level="ERROR",
+                message="Error creating test",
+                extra_fields={"error": str(e), "vgcpid": vgcpid},
+            )
             raise e
 
     @staticmethod
-    def update_details(test_id, vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description):
+    def update_details(
+        test_id,
+        vgcpid,
+        request_id,
+        assigned_tester_id,
+        requires_dat,
+        requires_oet,
+        due_date,
+        estimated_date,
+        description,
+    ):
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -175,7 +229,11 @@ class TestRepository:
 
                     query = """
                         UPDATE tests
-                        SET control_id = (SELECT control_id FROM controls WHERE vgcpid = %s),
+                        SET control_id = (
+                            SELECT control_id
+                            FROM controls
+                            WHERE vgcpid = %s
+                        ),
                             request_id = %s,
                             assigned_tester_id = %s,
                             requires_dat = %s,
@@ -186,7 +244,20 @@ class TestRepository:
                         WHERE test_id = %s
                         RETURNING *;
                     """
-                    cur.execute(query, (vgcpid, request_id, assigned_tester_id, requires_dat, requires_oet, due_date, estimated_date, description, test_id))
+                    cur.execute(
+                        query,
+                        (
+                            vgcpid,
+                            request_id,
+                            assigned_tester_id,
+                            requires_dat,
+                            requires_oet,
+                            due_date,
+                            estimated_date,
+                            description,
+                            test_id,
+                        ),
+                    )
                     row = cur.fetchone()
                     updated = dict(row) if row else None
                     TestAuditUtils.audit_update(cur, before_row, updated)
@@ -195,7 +266,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error updating test details", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error updating test details",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
 
     @staticmethod
@@ -223,7 +298,15 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error updating assigned tester", extra_fields={"error": str(e), "test_id": test_id, "assigned_tester_id": assigned_tester_id})
+            Logger.log(
+                level="ERROR",
+                message="Error updating assigned tester",
+                extra_fields={
+                    "error": str(e),
+                    "test_id": test_id,
+                    "assigned_tester_id": assigned_tester_id,
+                },
+            )
             raise e
 
     @staticmethod
@@ -251,7 +334,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error updating DAT track", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error updating DAT track",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
 
     @staticmethod
@@ -279,7 +366,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error updating OET track", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error updating OET track",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
 
     @staticmethod
@@ -311,7 +402,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error starting test", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error starting test",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
 
     @staticmethod
@@ -339,7 +434,11 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error reviewing test", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error reviewing test",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
 
     @staticmethod
@@ -350,11 +449,15 @@ class TestRepository:
                 with conn.cursor() as cur:
                     before_row = None
                     if TestAuditUtils.get_context():
-                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+                        before_row = TestAuditUtils.fetch_before(
+                            cur,
+                            test_id,
+                        )
 
                     query = """
                         UPDATE tests
-                        SET status = 'COMPLETED', complete_date = COALESCE(complete_date, current_date)
+                        SET status = 'COMPLETED',
+                            complete_date = COALESCE(complete_date, current_date)
                         WHERE test_id = %s
                         RETURNING *;
                     """
@@ -367,9 +470,13 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error completing test", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error completing test",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
-    
+
     @staticmethod
     def soft_delete(test_id):
         try:
@@ -395,9 +502,13 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error soft deleting test", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error soft deleting test",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e
-    
+
     @staticmethod
     def hard_delete(test_id):
         try:
@@ -422,5 +533,9 @@ class TestRepository:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error hard deleting test", extra_fields={"error": str(e), "test_id": test_id})
+            Logger.log(
+                level="ERROR",
+                message="Error hard deleting test",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
             raise e

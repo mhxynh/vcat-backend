@@ -6,6 +6,7 @@ class TableNames:
     AUDIT_LOGS = "audit_logs"
     USERS = "users"
 
+
 class StatusCodes:
     OK = 200
     BAD_REQUEST = 400
@@ -15,11 +16,13 @@ class StatusCodes:
     METHOD_NOT_ALLOWED = 405
     INTERNAL_SERVER_ERROR = 500
 
+
 class Methods:
     GET = "GET"
     POST = "POST"
     PUT = "PUT"
     DELETE = "DELETE"
+
 
 class LogLevels:
     INFO = "INFO"

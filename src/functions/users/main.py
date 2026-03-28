@@ -5,6 +5,7 @@ from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
 
+
 def lambda_handler(event, context):
     if event.get("httpMethod") == "OPTIONS":
         return ResponseUtils.cors_preflight()
@@ -13,7 +14,9 @@ def lambda_handler(event, context):
 
     if len(event) == 0:
         Logger.log(level=LogLevels.ERROR, message="No event data provided")
-        return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "No event data provided"})
+        return ResponseUtils.http_response(
+            StatusCodes.BAD_REQUEST, {"error": "No event data provided"}
+        )
 
     Logger.log(level=LogLevels.INFO, message="Users Function Started")
 
@@ -35,58 +38,121 @@ def lambda_handler(event, context):
                 email = params.get("email")
                 results = CrudUtils.get_by_filter(TableNames.USERS, "email", email)
                 if not results:
-                    Logger.log(level=LogLevels.WARNING, message="User not found by email", extra_fields={"email": email})
-                    return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "email": email})
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="User not found by email",
+                        extra_fields={"email": email},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND,
+                        {"error": "User not found", "email": email},
+                    )
                 return ResponseUtils.http_response(StatusCodes.OK, results[0])
 
             # Filter by active status
             if params and params.get("is_active"):
                 raw = params.get("is_active")
                 is_active = str(raw).lower() == "true"
-                results = CrudUtils.get_by_filter(TableNames.USERS, "is_active", is_active)
-                Logger.log(level=LogLevels.INFO, message="Returning users filtered by is_active", extra_fields={"is_active": is_active, "count": len(results)})
+                results = CrudUtils.get_by_filter(
+                    TableNames.USERS, "is_active", is_active
+                )
+                Logger.log(
+                    level=LogLevels.INFO,
+                    message="Returning users filtered by is_active",
+                    extra_fields={"is_active": is_active, "count": len(results)},
+                )
                 return ResponseUtils.http_response(StatusCodes.OK, results)
 
             # No filters: return all
             users = CrudUtils.get_all(TableNames.USERS)
-            Logger.log(level=LogLevels.INFO, message="Returning users", extra_fields={"count": len(users)})
+            Logger.log(
+                level=LogLevels.INFO,
+                message="Returning users",
+                extra_fields={"count": len(users)},
+            )
             return ResponseUtils.http_response(StatusCodes.OK, users)
 
         # GET /users/{id}
         if method == Methods.GET:
             user_id = ResponseUtils.extract_id(event, normalized_path, TableNames.USERS)
-            
+
             user = CrudUtils.get_by_id(TableNames.USERS, "user_id", user_id)
             if not user:
-                Logger.log(level=LogLevels.WARNING, message="User not found", extra_fields={"user_id": user_id})
-                return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "user_id": user_id})
-            
-            Logger.log(level=LogLevels.INFO, message="Returning user", extra_fields={"user_id": user_id})
+                Logger.log(
+                    level=LogLevels.WARNING,
+                    message="User not found",
+                    extra_fields={"user_id": user_id},
+                )
+                return ResponseUtils.http_response(
+                    StatusCodes.NOT_FOUND,
+                    {"error": "User not found", "user_id": user_id},
+                )
+
+            Logger.log(
+                level=LogLevels.INFO,
+                message="Returning user",
+                extra_fields={"user_id": user_id},
+            )
             return ResponseUtils.http_response(StatusCodes.OK, user)
 
         # DELETE /users/{id} : Deactivate user
         if method == Methods.DELETE:
             if not AuthUtils.is_manager(event):
-                Logger.log(level=LogLevels.WARNING, message="Unauthorized user deactivation attempt")
-                return ResponseUtils.http_response(StatusCodes.FORBIDDEN, {"error": "Forbidden: Manager access required"})
-            
+                Logger.log(
+                    level=LogLevels.WARNING,
+                    message="Unauthorized user deactivation attempt",
+                )
+                return ResponseUtils.http_response(
+                    StatusCodes.FORBIDDEN,
+                    {"error": "Forbidden: Manager access required"},
+                )
+
             user_id = ResponseUtils.extract_id(event, normalized_path, TableNames.USERS)
             if user_id is None:
-                Logger.log(level=LogLevels.ERROR, message="User ID not provided in path for delete")
-                return ResponseUtils.http_response(StatusCodes.BAD_REQUEST, {"error": "User ID not provided"})
+                Logger.log(
+                    level=LogLevels.ERROR,
+                    message="User ID not provided in path for delete",
+                )
+                return ResponseUtils.http_response(
+                    StatusCodes.BAD_REQUEST, {"error": "User ID not provided"}
+                )
 
             deactivated = CrudUtils.deactivate(TableNames.USERS, "user_id", user_id)
             if not deactivated:
-                Logger.log(level=LogLevels.WARNING, message="User not found for deactivate", extra_fields={"user_id": user_id})
-                return ResponseUtils.http_response(StatusCodes.NOT_FOUND, {"error": "User not found", "user_id": user_id})
+                Logger.log(
+                    level=LogLevels.WARNING,
+                    message="User not found for deactivate",
+                    extra_fields={"user_id": user_id},
+                )
+                return ResponseUtils.http_response(
+                    StatusCodes.NOT_FOUND,
+                    {"error": "User not found", "user_id": user_id},
+                )
 
-            Logger.log(level=LogLevels.INFO, message="Deactivated user", extra_fields={"user_id": user_id})
+            Logger.log(
+                level=LogLevels.INFO,
+                message="Deactivated user",
+                extra_fields={"user_id": user_id},
+            )
             return ResponseUtils.http_response(StatusCodes.OK, deactivated)
 
-        Logger.log(level=LogLevels.WARNING, message="Method not allowed", extra_fields={"method": method, "path": normalized_path})
-        return ResponseUtils.http_response(StatusCodes.METHOD_NOT_ALLOWED, {"error": f"Method {method} not allowed on path {normalized_path}"})
+        Logger.log(
+            level=LogLevels.WARNING,
+            message="Method not allowed",
+            extra_fields={"method": method, "path": normalized_path},
+        )
+        return ResponseUtils.http_response(
+            StatusCodes.METHOD_NOT_ALLOWED,
+            {"error": f"Method {method} not allowed on path {normalized_path}"},
+        )
     except Exception as e:
-        Logger.log(level=LogLevels.ERROR, message="Error in users handler", extra_fields={"exception": str(e)})
-        return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)})
+        Logger.log(
+            level=LogLevels.ERROR,
+            message="Error in users handler",
+            extra_fields={"exception": str(e)},
+        )
+        return ResponseUtils.http_response(
+            StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)}
+        )
     finally:
         CrudUtils.clear_audit_context()

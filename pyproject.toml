@@ -11,3 +11,16 @@ fail_under = 95
 pythonpath = ["src", "src/functions/common/python"]
 testpaths = ["tests"]
 addopts = "--cov=src --cov-report=term-missing --cov-fail-under=95"
+
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.aws-sam
+  | \.git
+  | \.venv
+  | env
+  | node_modules
+)/
+'''
