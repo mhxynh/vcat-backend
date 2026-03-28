@@ -163,9 +163,11 @@ class TestTestRepository(TestCase):
         args, _ = mock_cursor.execute.call_args
         sql_query, sql_params = args[0], args[1]
 
-        self.assertIn("SET control_id = (SELECT control_id FROM controls WHERE vgcpid = %s)", sql_query)
-        self.assertIn("request_id = %s", sql_query)
-        self.assertIn("description = %s", sql_query)
+        normalized_query = ' '.join(sql_query.split())
+
+        self.assertIn("SET control_id = ( SELECT control_id FROM controls WHERE vgcpid = %s", normalized_query)
+        self.assertIn("request_id = %s", normalized_query)
+        self.assertIn("description = %s", normalized_query)
         
         self.assertEqual(sql_params[0], "VGCP-101010")
         self.assertEqual(sql_params[-1], 42) # test_id should be last for the WHERE clause
