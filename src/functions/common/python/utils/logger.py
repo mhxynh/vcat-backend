@@ -1,5 +1,5 @@
-import json
 import time
+
 
 class Logger:
     start_time = None

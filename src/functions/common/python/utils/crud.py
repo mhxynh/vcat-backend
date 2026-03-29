@@ -2,6 +2,7 @@ from utils.db_utils import DbUtils
 from utils.logger import Logger
 from utils.audit import AuditUtils
 
+
 class CrudUtils:
     _audit_context = None
 
@@ -22,14 +23,18 @@ class CrudUtils:
             try:
                 with conn.cursor() as cur:
                     if order_by:
-                        cur.execute(f"SELECT * FROM {table} ORDER BY {order_by} DESC") 
+                        cur.execute(f"SELECT * FROM {table} ORDER BY {order_by} DESC")
                     else:
-                        cur.execute(f"SELECT * FROM {table}") 
+                        cur.execute(f"SELECT * FROM {table}")
                     return [dict(row) for row in cur.fetchall()]
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching all records", extra_fields={"error": str(e), "table": table})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching all records",
+                extra_fields={"error": str(e), "table": table},
+            )
             raise e
 
     @staticmethod
@@ -38,13 +43,24 @@ class CrudUtils:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                    cur.execute(
+                        f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,)
+                    )
                     row = cur.fetchone()
                     return dict(row) if row else None
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching record by ID", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching record by ID",
+                extra_fields={
+                    "error": str(e),
+                    "table": table,
+                    "pk_column": pk_column,
+                    "pk_value": pk_value,
+                },
+            )
             raise e
 
     @staticmethod
@@ -58,7 +74,16 @@ class CrudUtils:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error fetching records by filter", extra_fields={"error": str(e), "table": table, "column": column, "value": value})
+            Logger.log(
+                level="ERROR",
+                message="Error fetching records by filter",
+                extra_fields={
+                    "error": str(e),
+                    "table": table,
+                    "column": column,
+                    "value": value,
+                },
+            )
             raise e
 
     @staticmethod
@@ -69,15 +94,25 @@ class CrudUtils:
                 with conn.cursor() as cur:
                     cols = ", ".join(columns)
                     placeholders = ", ".join(["%s"] * len(values))
-                    cur.execute(f"INSERT INTO {table} ({cols}) VALUES ({placeholders}) RETURNING *", values)
+                    cur.execute(
+                        f"INSERT INTO {table} ({cols}) "
+                        f"VALUES ({placeholders}) RETURNING *",
+                        values,
+                    )
                     created_row = dict(cur.fetchone())
-                    AuditUtils.audit_create(cur, table, created_row, CrudUtils._audit_context)
+                    AuditUtils.audit_create(
+                        cur, table, created_row, CrudUtils._audit_context
+                    )
                     conn.commit()
                     return created_row
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error creating record", extra_fields={"error": str(e), "table": table, "columns": columns})
+            Logger.log(
+                level="ERROR",
+                message="Error creating record",
+                extra_fields={"error": str(e), "table": table, "columns": columns},
+            )
             raise e
 
     @staticmethod
@@ -87,13 +122,21 @@ class CrudUtils:
             try:
                 with conn.cursor() as cur:
                     before_row = None
-                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
-                        cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(
+                        table
+                    ):
+                        cur.execute(
+                            f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,)
+                        )
                         before_row = cur.fetchone()
 
                     set_clause = ", ".join([f"{col} = %s" for col in updates.keys()])
                     values = list(updates.values()) + [pk_value]
-                    cur.execute(f"UPDATE {table} SET {set_clause} WHERE {pk_column} = %s RETURNING *", values)
+                    cur.execute(
+                        f"UPDATE {table} SET {set_clause} "
+                        f"WHERE {pk_column} = %s RETURNING *",
+                        values,
+                    )
                     row = cur.fetchone()
                     updated_row = dict(row) if row else None
                     AuditUtils.audit_update(
@@ -109,7 +152,17 @@ class CrudUtils:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error updating record", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value, "updates": updates})
+            Logger.log(
+                level="ERROR",
+                message="Error updating record",
+                extra_fields={
+                    "error": str(e),
+                    "table": table,
+                    "pk_column": pk_column,
+                    "pk_value": pk_value,
+                    "updates": updates,
+                },
+            )
             raise e
 
     @staticmethod
@@ -119,11 +172,19 @@ class CrudUtils:
             try:
                 with conn.cursor() as cur:
                     before_row = None
-                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
-                        cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(
+                        table
+                    ):
+                        cur.execute(
+                            f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,)
+                        )
                         before_row = cur.fetchone()
 
-                    cur.execute(f"UPDATE {table} SET is_active = FALSE WHERE {pk_column} = %s RETURNING *", (pk_value,))
+                    cur.execute(
+                        f"UPDATE {table} SET is_active = FALSE "
+                        f"WHERE {pk_column} = %s RETURNING *",
+                        (pk_value,),
+                    )
                     row = cur.fetchone()
                     deactivated_row = dict(row) if row else None
                     AuditUtils.audit_delete(
@@ -139,7 +200,16 @@ class CrudUtils:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error deactivating record", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value})
+            Logger.log(
+                level="ERROR",
+                message="Error deactivating record",
+                extra_fields={
+                    "error": str(e),
+                    "table": table,
+                    "pk_column": pk_column,
+                    "pk_value": pk_value,
+                },
+            )
             raise e
 
     @staticmethod
@@ -149,11 +219,18 @@ class CrudUtils:
             try:
                 with conn.cursor() as cur:
                     before_row = None
-                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
-                        cur.execute(f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,))
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(
+                        table
+                    ):
+                        cur.execute(
+                            f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,)
+                        )
                         before_row = cur.fetchone()
 
-                    cur.execute(f"DELETE FROM {table} WHERE {pk_column} = %s RETURNING *", (pk_value,))
+                    cur.execute(
+                        f"DELETE FROM {table} WHERE {pk_column} = %s RETURNING *",
+                        (pk_value,),
+                    )
                     row = cur.fetchone()
                     deleted_row = dict(row) if row else None
                     AuditUtils.audit_delete(
@@ -169,5 +246,14 @@ class CrudUtils:
             finally:
                 conn.close()
         except Exception as e:
-            Logger.log(level="ERROR", message="Error hard deleting record", extra_fields={"error": str(e), "table": table, "pk_column": pk_column, "pk_value": pk_value})
+            Logger.log(
+                level="ERROR",
+                message="Error hard deleting record",
+                extra_fields={
+                    "error": str(e),
+                    "table": table,
+                    "pk_column": pk_column,
+                    "pk_value": pk_value,
+                },
+            )
             raise e

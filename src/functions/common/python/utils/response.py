@@ -1,10 +1,12 @@
 import json
 from datetime import date, datetime
 
+ALLOW_HEADERS = "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token"
+
+
 class ResponseUtils:
     @staticmethod
     def default_serializer(obj):
-        # Handles types that json.dumps cannot serialize natively. (i.e. "date_created" and "last_tested")
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
@@ -15,7 +17,7 @@ class ResponseUtils:
             "statusCode": 200,
             "headers": {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Headers": ALLOW_HEADERS,
                 "Access-Control-Allow-Methods": "OPTIONS,POST,GET,PUT,DELETE",
             },
             "body": "",
@@ -29,14 +31,16 @@ class ResponseUtils:
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+                "Access-Control-Allow-Headers": ALLOW_HEADERS,
                 "Access-Control-Allow-Methods": "OPTIONS,POST,GET,PUT,DELETE",
             },
         }
-    
+
     @staticmethod
     def get_method_and_path(event):
-        method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
+        method = event.get("httpMethod") or event.get("requestContext", {}).get(
+            "http", {}
+        ).get("method")
         path = event.get("path") or event.get("rawPath")
 
         return method or "", path or ""

@@ -55,7 +55,11 @@ class TestAuditUtils:
         if not context or not after_row:
             return
 
-        before_snapshot = AuditUtils.snapshot_for_table(_TEST_TABLE, before_row) if before_row else None
+        before_snapshot = (
+            AuditUtils.snapshot_for_table(_TEST_TABLE, before_row)
+            if before_row
+            else None
+        )
         after_snapshot = AuditUtils.snapshot_for_table(_TEST_TABLE, after_row)
         diff = AuditUtils.build_diff(before_snapshot or {}, after_snapshot or {})
         if not diff:
@@ -85,7 +89,11 @@ class TestAuditUtils:
             entity_type=_TEST_CONFIG["entity_type"],
             entity_id=after_row.get(_TEST_CONFIG["id_column"]),
             action="DELETE",
-            before_snapshot=AuditUtils.snapshot_for_table(_TEST_TABLE, before_row) if before_row else None,
+            before_snapshot=(
+                AuditUtils.snapshot_for_table(_TEST_TABLE, before_row)
+                if before_row
+                else None
+            ),
             after_snapshot={"status": "ARCHIVED"},
             snapshot_mode="FULL_BEFORE",
             changed_fields=["status"],
@@ -103,7 +111,11 @@ class TestAuditUtils:
             entity_type=_TEST_CONFIG["entity_type"],
             entity_id=deleted_row.get(_TEST_CONFIG["id_column"]),
             action="DELETE",
-            before_snapshot=AuditUtils.snapshot_for_table(_TEST_TABLE, before_row) if before_row else None,
+            before_snapshot=(
+                AuditUtils.snapshot_for_table(_TEST_TABLE, before_row)
+                if before_row
+                else None
+            ),
             after_snapshot=None,
             snapshot_mode="FULL_BEFORE",
             changed_fields=["*"],

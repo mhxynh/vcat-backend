@@ -98,7 +98,11 @@ class UserResolver:
     @staticmethod
     def _resolve_display_name(claims, email):
         """Extract display name from claims, fall back to email prefix."""
-        name = claims.get("name") or claims.get("cognito:username") or claims.get("preferred_username")
+        name = (
+            claims.get("name")
+            or claims.get("cognito:username")
+            or claims.get("preferred_username")
+        )
         if name:
             return name
         return email.split("@")[0]
