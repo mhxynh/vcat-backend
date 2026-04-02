@@ -314,6 +314,16 @@ INSERT INTO comments (author_user_id, request_id, comment_text)
 VALUES (%s, %s, %s)
 RETURNING *;
 
+-- Delete comment by test_id
+DELETE FROM comments
+WHERE test_id = %s
+RETURNING *;
+
+-- Delete comment by request_id
+DELETE FROM comments
+WHERE request_id = %s
+RETURNING *;
+
 ---------- AUDIT LOG QUERIES ----------
 -- Get audit trail for entity
 SELECT *

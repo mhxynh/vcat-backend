@@ -237,6 +237,14 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+        CreateComment:
+          Type: Api
+          Properties:
+            Path: /comments
+            Method: post
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   AuditFunction:
     Type: AWS::Serverless::Function
