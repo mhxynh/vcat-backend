@@ -62,6 +62,13 @@ Resources:
         Authorizers:
           MyCognitoAuthorizer:
             UserPoolArn: !Ref UserPoolArnPath
+  VcatUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
 
   CommonDependencyLayer:
     Type: AWS::Serverless::LayerVersion
