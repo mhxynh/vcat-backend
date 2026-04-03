@@ -62,13 +62,6 @@ Resources:
         Authorizers:
           MyCognitoAuthorizer:
             UserPoolArn: !Ref UserPoolArnPath
-  VcatUserPoolClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH
-        - ALLOW_REFRESH_TOKEN_AUTH
-        - ALLOW_USER_SRP_AUTH
 
   CommonDependencyLayer:
     Type: AWS::Serverless::LayerVersion
@@ -242,16 +235,21 @@ Resources:
             Path: /comments
             Method: get
             RestApiId: !Ref VcatApi
-            Auth:
-              Authorizer: MyCognitoAuthorizer
         CreateComment:
           Type: Api
           Properties:
             Path: /comments
             Method: post
             RestApiId: !Ref VcatApi
-            Auth:
-              Authorizer: MyCognitoAuthorizer
+        DeleteCommentsByTestId:
+          Type: Api
+          Properties:
+            Path: /comments
+            Method: delete
+            RestApiId: !Ref VcatApi
+            RequestParameters:
+              - method.request.querystrings.test_id:
+                  Required: true
 
   AuditFunction:
     Type: AWS::Serverless::Function
