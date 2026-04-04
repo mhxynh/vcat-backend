@@ -210,12 +210,12 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_by_test_id_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "user-1"
-        mock_crud.delete_by_column.return_value = {"deleted": 2}
+        mock_crud.hard_delete.return_value = {"deleted": 2}
 
         event = self._build_event("DELETE", "/comments", query_params={"test_id": "10"})
         result = comments.lambda_handler(event, None)
 
-        mock_crud.delete_by_column.assert_called_once_with(comments.TableNames.COMMENTS, "test_id", "10")
+        mock_crud.hard_delete.assert_called_once_with(comments.TableNames.COMMENTS, "test_id", "10")
         mock_logger.log.assert_any_call(level="INFO", message="Deleted comment(s)", extra_fields={"test_id": "10", "request_id": None})
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["deleted"], 2)
@@ -225,12 +225,12 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_by_request_id_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "user-1"
-        mock_crud.delete_by_column.return_value = {"deleted": 1}
+        mock_crud.hard_delete.return_value = {"deleted": 1}
 
         event = self._build_event("DELETE", "/comments", query_params={"request_id": "20"})
         result = comments.lambda_handler(event, None)
 
-        mock_crud.delete_by_column.assert_called_once_with(comments.TableNames.COMMENTS, "request_id", "20")
+        mock_crud.hard_delete.assert_called_once_with(comments.TableNames.COMMENTS, "request_id", "20")
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["deleted"], 1)
 
