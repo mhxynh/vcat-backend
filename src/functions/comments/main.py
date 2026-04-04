@@ -121,37 +121,54 @@ def lambda_handler(event, context):
             )
             return ResponseUtils.http_response(StatusCodes.OK, created)
         
-        # DELETE /comments?test_id=... : delete comments for a test
-        # DELETE /comments?request_id=... : delete comments for a request
+        # DELETE /comments?comment_id=...&author_user_id=...&test_id=...
+        # DELETE /comments?comment_id=...&author_user_id=...&request_id=...
         if method == Methods.DELETE and normalized_path == "/comments":
             params = event.get("queryStringParameters", {}) or {}
+            comment_id = params.get("comment_id")
+            author_user_id = params.get("author_user_id")
             test_id = params.get("test_id")
             request_id = params.get("request_id")
 
-            if bool(test_id) == bool(request_id):
+            if not comment_id or not author_user_id or bool(test_id) == bool(request_id):
                 Logger.log(
                     level=LogLevels.ERROR,
                     message="Invalid delete target",
-                    extra_fields={"test_id": test_id, "request_id": request_id},
+                    extra_fields={
+                        "comment_id": comment_id,
+                        "author_user_id": author_user_id,
+                        "test_id": test_id,
+                        "request_id": request_id,
+                    },
                 )
                 return ResponseUtils.http_response(
                     StatusCodes.BAD_REQUEST,
-                    {"error": "Provide exactly one of test_id or request_id"},
+                    {
+                        "error": (
+                            "Provide comment_id, author_user_id, and exactly one of "
+                            "test_id or request_id"
+                        )
+                    },
                 )
 
             if test_id:
                 deleted = CrudUtils.hard_delete(
-                    TableNames.COMMENTS, "test_id", test_id
+                    TableNames.COMMENTS,
+                    ["comment_id", "author_user_id", "test_id"],
+                    [comment_id, author_user_id, test_id],
                 )
             else:
                 deleted = CrudUtils.hard_delete(
-                    TableNames.COMMENTS, "request_id", request_id
+                    TableNames.COMMENTS,
+                    ["comment_id", "author_user_id", "request_id"],
+                    [comment_id, author_user_id, request_id],
                 )
 
             Logger.log(
                 level=LogLevels.INFO,
-                message="Deleted comment(s)",
+                message="Deleted comment",
                 extra_fields={
+                    "comment_id": comment_id,
                     "test_id": test_id,
                     "request_id": request_id,
                 },

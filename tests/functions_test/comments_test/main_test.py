@@ -212,11 +212,27 @@ class TestCommentsMain(TestCase):
         mock_user_resolver.resolve.return_value = "user-1"
         mock_crud.hard_delete.return_value = {"deleted": 2}
 
-        event = self._build_event("DELETE", "/comments", query_params={"test_id": "10"})
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "1",
+                "author_user_id": "5",
+                "test_id": "10",
+            },
+        )
         result = comments.lambda_handler(event, None)
 
-        mock_crud.hard_delete.assert_called_once_with(comments.TableNames.COMMENTS, "test_id", "10")
-        mock_logger.log.assert_any_call(level="INFO", message="Deleted comment(s)", extra_fields={"test_id": "10", "request_id": None})
+        mock_crud.hard_delete.assert_called_once_with(
+            comments.TableNames.COMMENTS,
+            ["comment_id", "author_user_id", "test_id"],
+            ["1", "5", "10"],
+        )
+        mock_logger.log.assert_any_call(
+            level="INFO",
+            message="Deleted comment",
+            extra_fields={"comment_id": "1", "test_id": "10", "request_id": None},
+        )
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["deleted"], 2)
 
@@ -227,10 +243,22 @@ class TestCommentsMain(TestCase):
         mock_user_resolver.resolve.return_value = "user-1"
         mock_crud.hard_delete.return_value = {"deleted": 1}
 
-        event = self._build_event("DELETE", "/comments", query_params={"request_id": "20"})
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "2",
+                "author_user_id": "5",
+                "request_id": "20",
+            },
+        )
         result = comments.lambda_handler(event, None)
 
-        mock_crud.hard_delete.assert_called_once_with(comments.TableNames.COMMENTS, "request_id", "20")
+        mock_crud.hard_delete.assert_called_once_with(
+            comments.TableNames.COMMENTS,
+            ["comment_id", "author_user_id", "request_id"],
+            ["2", "5", "20"],
+        )
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["deleted"], 1)
 
@@ -240,10 +268,28 @@ class TestCommentsMain(TestCase):
     def test_delete_comments_with_both_targets_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "user-1"
 
-        event = self._build_event("DELETE", "/comments", query_params={"test_id": "10", "request_id": "20"})
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "1",
+                "author_user_id": "5",
+                "test_id": "10",
+                "request_id": "20",
+            },
+        )
         result = comments.lambda_handler(event, None)
 
-        mock_logger.log.assert_any_call(level="ERROR", message="Invalid delete target", extra_fields={"test_id": "10", "request_id": "20"})
+        mock_logger.log.assert_any_call(
+            level="ERROR",
+            message="Invalid delete target",
+            extra_fields={
+                "comment_id": "1",
+                "author_user_id": "5",
+                "test_id": "10",
+                "request_id": "20",
+            },
+        )
         self.assertEqual(result["statusCode"], 400)
 
     @patch("functions.comments.main.Logger")
@@ -252,10 +298,26 @@ class TestCommentsMain(TestCase):
     def test_delete_comments_with_no_target_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "user-1"
 
-        event = self._build_event("DELETE", "/comments")
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "1",
+                "author_user_id": "5",
+            },
+        )
         result = comments.lambda_handler(event, None)
 
-        mock_logger.log.assert_any_call(level="ERROR", message="Invalid delete target", extra_fields={"test_id": None, "request_id": None})
+        mock_logger.log.assert_any_call(
+            level="ERROR",
+            message="Invalid delete target",
+            extra_fields={
+                "comment_id": "1",
+                "author_user_id": "5",
+                "test_id": None,
+                "request_id": None,
+            },
+        )
         self.assertEqual(result["statusCode"], 400)
 
     # Method not allowed
