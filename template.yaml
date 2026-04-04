@@ -57,6 +57,7 @@ Resources:
               Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
       Auth:
+        # Commenting out default authorizer to allow unauthenticated access to endpoints
         DefaultAuthorizer: MyCognitoAuthorizer
         AddDefaultAuthorizerToCorsPreflight: false
         Authorizers:

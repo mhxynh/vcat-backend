@@ -140,11 +140,11 @@ def lambda_handler(event, context):
                 )
 
             if test_id:
-                deleted = CrudUtils.delete_by_column(
+                deleted = CrudUtils.hard_delete(
                     TableNames.COMMENTS, "test_id", test_id
                 )
             else:
-                deleted = CrudUtils.delete_by_column(
+                deleted = CrudUtils.hard_delete(
                     TableNames.COMMENTS, "request_id", request_id
                 )
 
