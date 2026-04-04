@@ -252,10 +252,54 @@ class TestCrudUtils(TestCase):
 
         result = CrudUtils.hard_delete("controls", "vgcpid", "VGCP-001")
 
-        mock_cursor.execute.assert_called_once_with("DELETE FROM controls WHERE vgcpid = %s RETURNING *", ("VGCP-001",))
+        mock_cursor.execute.assert_called_once_with(
+            "DELETE FROM controls WHERE vgcpid = %s RETURNING *",
+            ("VGCP-001",)
+        )
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
         self.assertEqual(result["vgcpid"], "VGCP-001")
+
+    @patch('utils.crud.DbUtils')
+    def test_hard_delete_success_with_multiple_columns(self, mock_db):
+        deleted_row = {
+            "comment_id": 19,
+            "author_user_id": 1,
+            "test_id": 10,
+            "comment_text": "Test comment",
+        }
+        mock_conn, mock_cursor = self._mock_connection(deleted_row, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = CrudUtils.hard_delete(
+            "comments",
+            ["comment_id", "author_user_id", "test_id"],
+            [19, 1, 10],
+        )
+
+        mock_cursor.execute.assert_called_once_with(
+            "DELETE FROM comments WHERE comment_id = %s AND author_user_id = %s AND test_id = %s RETURNING *",
+            (19, 1, 10),
+        )
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+        self.assertEqual(result["comment_id"], 19)
+
+    @patch('utils.crud.Logger')
+    @patch('utils.crud.DbUtils')
+    def test_hard_delete_raises_on_mismatched_column_and_value_lengths(self, mock_db, mock_logger):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        with self.assertRaises(ValueError):
+            CrudUtils.hard_delete(
+                "comments",
+                ["comment_id", "author_user_id"],
+                [19],
+            )
+
+        mock_logger.log.assert_called_once()
+        mock_conn.close.assert_called_once()
 
     @patch('utils.crud.DbUtils')
     def test_hard_delete_returns_none_when_not_found(self, mock_db):
@@ -275,4 +319,13 @@ class TestCrudUtils(TestCase):
         with self.assertRaises(Exception):
             CrudUtils.hard_delete("controls", "vgcpid", "VGCP-001")
 
-        mock_logger.log.assert_called_once_with(level="ERROR", message="Error hard deleting record", extra_fields={"error": "DB down", "table": "controls", "pk_column": "vgcpid", "pk_value": "VGCP-001"})
+        mock_logger.log.assert_called_once_with(
+            level="ERROR",
+            message="Error hard deleting record",
+            extra_fields={
+                "error": "DB down",
+                "table": "controls",
+                "pk_column": "vgcpid",
+                "pk_value": "VGCP-001"
+            }
+        )
