@@ -120,7 +120,7 @@ def lambda_handler(event, context):
                 },
             )
             return ResponseUtils.http_response(StatusCodes.OK, created)
-        
+
         # DELETE /comments?comment_id=...&author_user_id=...&test_id=...
         # DELETE /comments?comment_id=...&author_user_id=...&request_id=...
         if method == Methods.DELETE and normalized_path == "/comments":
@@ -130,7 +130,11 @@ def lambda_handler(event, context):
             test_id = params.get("test_id")
             request_id = params.get("request_id")
 
-            if not comment_id or not author_user_id or bool(test_id) == bool(request_id):
+            if (
+                not comment_id
+                or not author_user_id
+                or bool(test_id) == bool(request_id)
+            ):
                 Logger.log(
                     level=LogLevels.ERROR,
                     message="Invalid delete target",

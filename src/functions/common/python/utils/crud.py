@@ -227,10 +227,16 @@ class CrudUtils:
                         pk_value = [pk_value]
 
                     if len(pk_column) != len(pk_value):
-                        raise ValueError("pk_column and pk_value must have the same length")
+                        raise ValueError(
+                            "pk_column and pk_value must have the same length"
+                        )
 
-                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(table):
-                        where_clause = " AND ".join([f"{col} = %s" for col in pk_column])
+                    if CrudUtils._audit_context and AuditUtils.get_table_audit_config(
+                        table
+                    ):
+                        where_clause = " AND ".join(
+                            [f"{col} = %s" for col in pk_column]
+                        )
                         cur.execute(
                             f"SELECT * FROM {table} WHERE {where_clause}",
                             tuple(pk_value),
