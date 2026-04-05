@@ -213,26 +213,44 @@ class CrudUtils:
             raise e
 
     @staticmethod
+    @staticmethod
     def hard_delete(table, pk_column, pk_value):
         try:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
                     before_row = None
+
+                    if not isinstance(pk_column, (list, tuple)):
+                        pk_column = [pk_column]
+                    if not isinstance(pk_value, (list, tuple)):
+                        pk_value = [pk_value]
+
+                    if len(pk_column) != len(pk_value):
+                        raise ValueError(
+                            "pk_column and pk_value must have the same length"
+                        )
+
                     if CrudUtils._audit_context and AuditUtils.get_table_audit_config(
                         table
                     ):
+                        where_clause = " AND ".join(
+                            [f"{col} = %s" for col in pk_column]
+                        )
                         cur.execute(
-                            f"SELECT * FROM {table} WHERE {pk_column} = %s", (pk_value,)
+                            f"SELECT * FROM {table} WHERE {where_clause}",
+                            tuple(pk_value),
                         )
                         before_row = cur.fetchone()
 
+                    where_clause = " AND ".join([f"{col} = %s" for col in pk_column])
                     cur.execute(
-                        f"DELETE FROM {table} WHERE {pk_column} = %s RETURNING *",
-                        (pk_value,),
+                        f"DELETE FROM {table} WHERE {where_clause} RETURNING *",
+                        tuple(pk_value),
                     )
                     row = cur.fetchone()
                     deleted_row = dict(row) if row else None
+
                     AuditUtils.audit_delete(
                         cur=cur,
                         table=table,

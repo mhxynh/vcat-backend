@@ -57,6 +57,7 @@ Resources:
               Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
       Auth:
+        # Commenting out the next two lines to allow unauthenticated access to endpoints
         DefaultAuthorizer: MyCognitoAuthorizer
         AddDefaultAuthorizerToCorsPreflight: false
         Authorizers:
@@ -235,8 +236,21 @@ Resources:
             Path: /comments
             Method: get
             RestApiId: !Ref VcatApi
-            Auth:
-              Authorizer: MyCognitoAuthorizer
+        CreateComment:
+          Type: Api
+          Properties:
+            Path: /comments
+            Method: post
+            RestApiId: !Ref VcatApi
+        DeleteCommentsByTestId:
+          Type: Api
+          Properties:
+            Path: /comments
+            Method: delete
+            RestApiId: !Ref VcatApi
+            RequestParameters:
+              - method.request.querystrings.test_id:
+                  Required: true
 
   AuditFunction:
     Type: AWS::Serverless::Function
