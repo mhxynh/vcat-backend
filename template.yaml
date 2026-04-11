@@ -236,21 +236,24 @@ Resources:
             Path: /comments
             Method: get
             RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
         CreateComment:
           Type: Api
           Properties:
             Path: /comments
             Method: post
             RestApiId: !Ref VcatApi
-        DeleteCommentsByTestId:
+            Auth:
+              Authorizer: MyCognitoAuthorizer
+        DeleteComment:
           Type: Api
           Properties:
             Path: /comments
             Method: delete
             RestApiId: !Ref VcatApi
-            RequestParameters:
-              - method.request.querystrings.test_id:
-                  Required: true
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   AuditFunction:
     Type: AWS::Serverless::Function
