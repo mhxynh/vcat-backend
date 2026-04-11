@@ -2,7 +2,7 @@
 pycache/
 *.py[cod]
 *$py.class
-Postman
+postman
 
 # Distribution / Packaging
 build/
