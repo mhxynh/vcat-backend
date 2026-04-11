@@ -2,7 +2,6 @@
 pycache/
 *.py[cod]
 *$py.class
-postman/
 
 # Distribution / Packaging
 build/
@@ -40,6 +39,10 @@ ENV/
 
 # Environment Variables
 .env
+
+# Postman environment files
+postman/
+.postman
 
 # Unit test / coverage reports
 htmlcov/
