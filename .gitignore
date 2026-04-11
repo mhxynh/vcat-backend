@@ -40,6 +40,10 @@ ENV/
 # Environment Variables
 .env
 
+# Postman environment files
+postman/
+.postman
+
 # Unit test / coverage reports
 htmlcov/
 .tox/
