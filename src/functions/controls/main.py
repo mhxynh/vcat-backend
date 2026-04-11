@@ -159,6 +159,7 @@ def lambda_handler(event, context):
                 "control_sme",
                 "escalation",
                 "last_tested",
+                "is_active",
             ]
             updates = {
                 field: value for field, value in body.items() if field in allowed_fields
