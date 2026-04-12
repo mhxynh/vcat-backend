@@ -3,7 +3,7 @@
     "authorizer": {
       "claims": {
         "cognito:groups": "Managers, Testers",
-        "email": "moniqueh@vanguard.com"
+        "email": "moniqueh@vanguard.com, moniqueh@test.vanguard.com"
       }
     }
   }
