@@ -1,0 +1,10 @@
+{
+  "requestContext": {
+    "authorizer": {
+      "claims": {
+        "cognito:groups": "Managers",
+        "email": "moniqueh@vanguard.com"
+      }
+    }
+  }
+}
