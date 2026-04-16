@@ -94,6 +94,7 @@ def lambda_handler(event, context):
                 due_date=body["due_date"],
                 assigned_tester_id=body.get("assigned_tester_id"),
                 estimated_date=body.get("estimated_date"),
+                evidence_links=body.get("evidence_links"),
             )
 
             if not created:
@@ -159,6 +160,9 @@ def lambda_handler(event, context):
                     body.get("due_date"),
                     body.get("estimated_date"),
                     body.get("description"),
+                    TestRepository.update_evidence_links(
+                        test_id, body.get("evidence_links", [])
+                    ),
                 )
             else:
                 return ResponseUtils.http_response(

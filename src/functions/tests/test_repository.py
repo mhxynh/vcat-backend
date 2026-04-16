@@ -5,6 +5,25 @@ from utils.test_audit import TestAuditUtils
 
 class TestRepository:
     @staticmethod
+    def _normalize_evidence_links(evidence_links):
+        if evidence_links is None:
+            return None
+        if not isinstance(evidence_links, list):
+            raise ValueError("evidence_links must be an array of URLs")
+
+        cleaned = []
+        seen = set()
+        for link in evidence_links:
+            if link is None:
+                continue
+            value = str(link).strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            cleaned.append(value)
+        return cleaned
+
+    @staticmethod
     def set_audit_context(actor_user_id=None):
         TestAuditUtils.set_context(actor_user_id=actor_user_id)
 
@@ -152,11 +171,15 @@ class TestRepository:
         due_date,
         assigned_tester_id=None,
         estimated_date=None,
+        evidence_links=None,
     ):
         try:
             conn = DbUtils.get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    normalized_links = TestRepository._normalize_evidence_links(
+                        evidence_links
+                    )
                     query = """
                         INSERT INTO tests (
                             control_id,
@@ -166,9 +189,11 @@ class TestRepository:
                             requires_oet,
                             due_date,
                             estimated_date,
-                            description
+                            description,
+                            evidence_links
                         ) VALUES (
                             (SELECT control_id FROM controls WHERE vgcpid = %s),
+                            %s,
                             %s,
                             %s,
                             %s,
@@ -190,6 +215,7 @@ class TestRepository:
                             due_date,
                             estimated_date,
                             description,
+                            normalized_links if normalized_links is not None else [],
                         ),
                     )
                     row = cur.fetchone()
@@ -218,6 +244,7 @@ class TestRepository:
         due_date,
         estimated_date,
         description,
+        evidence_links=None,
     ):
         try:
             conn = DbUtils.get_db_connection()
@@ -226,6 +253,10 @@ class TestRepository:
                     before_row = None
                     if TestAuditUtils.get_context():
                         before_row = TestAuditUtils.fetch_before(cur, test_id)
+
+                    normalized_links = TestRepository._normalize_evidence_links(
+                        evidence_links
+                    )
 
                     query = """
                         UPDATE tests
@@ -240,7 +271,8 @@ class TestRepository:
                             requires_oet = %s,
                             due_date = %s,
                             estimated_date = %s,
-                            description = %s
+                            description = %s,
+                            evidence_links = COALESCE(%s, evidence_links)
                         WHERE test_id = %s
                         RETURNING *;
                     """
@@ -255,6 +287,7 @@ class TestRepository:
                             due_date,
                             estimated_date,
                             description,
+                            normalized_links,
                             test_id,
                         ),
                     )

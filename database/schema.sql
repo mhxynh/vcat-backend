@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS tests (
     estimated_date      DATE,
     due_date            DATE,
     complete_date       DATE,
+    evidence_links      TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
     status              test_status NOT NULL DEFAULT 'NOT_STARTED',
     priority            request_priority NOT NULL DEFAULT 'MEDIUM',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
