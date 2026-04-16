@@ -320,7 +320,7 @@ class TestRepository:
                         evidence_links
                     )
                     if normalized_links is None:
-                        normalized_links = []
+                        raise ValueError("evidence_links must be an array of URLs")
 
                     query = """
                         UPDATE tests

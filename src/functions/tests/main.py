@@ -155,8 +155,14 @@ def lambda_handler(event, context):
                         StatusCodes.BAD_REQUEST,
                         {"error": "evidence_links is required"},
                     )
+                evidence_links = body.get("evidence_links")
+                if not isinstance(evidence_links, list):
+                    return ResponseUtils.http_response(
+                        StatusCodes.BAD_REQUEST,
+                        {"error": "evidence_links must be a list"},
+                    )
                 updated_record = TestRepository.update_evidence_links(
-                    test_id, body.get("evidence_links")
+                    test_id, evidence_links
                 )
             elif action == "update_details":
                 updated_record = TestRepository.update_details(
