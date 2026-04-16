@@ -307,6 +307,44 @@ class TestRepository:
             raise e
 
     @staticmethod
+    def update_evidence_links(test_id, evidence_links):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
+                    normalized_links = TestRepository._normalize_evidence_links(
+                        evidence_links
+                    )
+                    if normalized_links is None:
+                        normalized_links = []
+
+                    query = """
+                        UPDATE tests
+                        SET evidence_links = %s
+                        WHERE test_id = %s
+                        RETURNING *;
+                    """
+                    cur.execute(query, (normalized_links, test_id))
+                    row = cur.fetchone()
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(
+                level="ERROR",
+                message="Error updating test evidence links",
+                extra_fields={"error": str(e), "test_id": test_id},
+            )
+            raise e
+
+    @staticmethod
     def update_assigned_tester(test_id, assigned_tester_id):
         try:
             conn = DbUtils.get_db_connection()

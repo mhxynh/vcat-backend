@@ -199,6 +199,49 @@ class TestTestRepository(TestCase):
         mock_logger.log.assert_called_once()
 
     @patch('functions.tests.test_repository.DbUtils')
+    def test_update_evidence_links_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(
+            {"test_id": 42, "evidence_links": ["https://example.com/evidence"]},
+            fetchone=True,
+        )
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_evidence_links(
+            42, ["https://example.com/evidence", "https://example.com/evidence"]
+        )
+
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("SET evidence_links = %s", args[0])
+        self.assertEqual(args[1], (["https://example.com/evidence"], 42))
+        mock_conn.commit.assert_called_once()
+        self.assertEqual(result["test_id"], 42)
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_evidence_links_not_found(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.update_evidence_links(9999, ["https://example.com/evidence"])
+
+        self.assertIsNone(result)
+
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_evidence_links_error(self, mock_db, mock_logger):
+        mock_db.get_db_connection.side_effect = Exception("DB down")
+        with self.assertRaises(Exception):
+            TestRepository.update_evidence_links(42, ["https://example.com/evidence"])
+        mock_logger.log.assert_called_once()
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_evidence_links_invalid_payload_raises(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        with self.assertRaises(ValueError):
+            TestRepository.update_evidence_links(42, "https://example.com/evidence")
+
+    @patch('functions.tests.test_repository.DbUtils')
     def test_update_assigned_tester_success(self, mock_db):
         mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "assigned_tester_id": 500}, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
