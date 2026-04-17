@@ -21,9 +21,9 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Comments Function Started")
 
     try:
-        actor_user_id = UserResolver.resolve(event)
+        user_id = UserResolver.resolve(event)
         CrudUtils.set_audit_context(
-            actor_user_id=actor_user_id,
+            user_id=user_id,
         )
 
         method, path = ResponseUtils.get_method_and_path(event)
@@ -74,7 +74,7 @@ def lambda_handler(event, context):
         if method == Methods.POST and normalized_path == "/comments":
             body = json.loads(event.get("body", "{}"))
 
-            required_fields = ["author_user_id", "comment_text"]
+            required_fields = ["comment_text"]
             missing = [field for field in required_fields if field not in body]
             if missing:
                 Logger.log(
@@ -85,6 +85,16 @@ def lambda_handler(event, context):
                 return ResponseUtils.http_response(
                     StatusCodes.BAD_REQUEST,
                     {"error": "Missing required fields", "missing": missing},
+                )
+
+            if user_id is None:
+                Logger.log(
+                    level=LogLevels.ERROR,
+                    message="Unable to resolve authenticated user for create",
+                )
+                return ResponseUtils.http_response(
+                    StatusCodes.UNAUTHORIZED,
+                    {"error": "Unable to resolve authenticated user"},
                 )
 
             test_id = body.get("test_id")
@@ -103,7 +113,7 @@ def lambda_handler(event, context):
 
             columns = ["author_user_id", "test_id", "request_id", "comment_text"]
             values = [
-                body.get("author_user_id"),
+                user_id,
                 test_id,
                 request_id,
                 body.get("comment_text"),
@@ -122,13 +132,12 @@ def lambda_handler(event, context):
             )
             return ResponseUtils.http_response(StatusCodes.OK, created)
 
-        # DELETE /comments?comment_id=...&author_user_id=...&test_id=...
-        # DELETE /comments?comment_id=...&author_user_id=...&request_id=...
-        # author_user_id is optional. Authenticated user is resolved from Cognito claims
+        # DELETE /comments?comment_id=...&test_id=...
+        # DELETE /comments?comment_id=...&request_id=...
+        # Authenticated user is resolved from Cognito claims.
         if method == Methods.DELETE and normalized_path == "/comments":
             params = event.get("queryStringParameters", {}) or {}
             comment_id = params.get("comment_id")
-            author_user_id = params.get("author_user_id")
             test_id = params.get("test_id")
             request_id = params.get("request_id")
 
@@ -138,7 +147,6 @@ def lambda_handler(event, context):
                     message="Invalid delete target",
                     extra_fields={
                         "comment_id": comment_id,
-                        "author_user_id": author_user_id,
                         "test_id": test_id,
                         "request_id": request_id,
                     },
@@ -153,7 +161,7 @@ def lambda_handler(event, context):
                     },
                 )
 
-            if actor_user_id is None:
+            if user_id is None:
                 Logger.log(
                     level=LogLevels.ERROR,
                     message="Unable to resolve authenticated user for delete",
@@ -164,22 +172,7 @@ def lambda_handler(event, context):
                     {"error": "Unable to resolve authenticated user"},
                 )
 
-            if author_user_id and str(author_user_id) != str(actor_user_id):
-                Logger.log(
-                    level=LogLevels.WARNING,
-                    message="Author user id does not match authenticated user",
-                    extra_fields={
-                        "comment_id": comment_id,
-                        "provided_author_user_id": author_user_id,
-                        "authenticated_user_id": actor_user_id,
-                    },
-                )
-                return ResponseUtils.http_response(
-                    StatusCodes.FORBIDDEN,
-                    {"error": "You are not authorized to delete this comment"},
-                )
-
-            effective_author_user_id = str(actor_user_id)
+            effective_author_user_id = str(user_id)
 
             if test_id:
                 deleted = CrudUtils.hard_delete(

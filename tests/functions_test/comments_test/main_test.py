@@ -105,7 +105,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_post_comment_for_test_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "user-1"
+        mock_user_resolver.resolve.return_value = 1
         mock_crud.create.return_value = {
             "comment_id": 99,
             "author_user_id": 1,
@@ -115,14 +115,17 @@ class TestCommentsMain(TestCase):
         }
 
         body = {
-            "author_user_id": 1,
             "test_id": 10,
             "comment_text": "New comment",
         }
         event = self._build_event("POST", "/comments", body=body)
         result = comments.lambda_handler(event, None)
 
-        mock_crud.create.assert_called_once()
+        mock_crud.create.assert_called_once_with(
+            comments.TableNames.COMMENTS,
+            ["author_user_id", "test_id", "request_id", "comment_text"],
+            [1, 10, None, "New comment"],
+        )
         mock_logger.log.assert_any_call(level="INFO", message="Created comment", extra_fields={"comment_id": 99, "test_id": 10, "request_id": None})
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["comment_id"], 99)
@@ -131,7 +134,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_post_comment_for_request_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "user-1"
+        mock_user_resolver.resolve.return_value = 1
         mock_crud.create.return_value = {
             "comment_id": 100,
             "author_user_id": 1,
@@ -141,7 +144,6 @@ class TestCommentsMain(TestCase):
         }
 
         body = {
-            "author_user_id": 1,
             "request_id": 20,
             "comment_text": "Request comment",
         }
@@ -157,7 +159,7 @@ class TestCommentsMain(TestCase):
     def test_post_comment_missing_fields_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "user-1"
 
-        event = self._build_event("POST", "/comments", body={"author_user_id": 1})
+        event = self._build_event("POST", "/comments", body={})
         result = comments.lambda_handler(event, None)
 
         mock_crud.create.assert_not_called()
@@ -172,11 +174,27 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.Logger")
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
+    def test_post_comment_without_resolved_user_returns_401(self, mock_user_resolver, mock_crud, mock_logger):
+        mock_user_resolver.resolve.return_value = None
+
+        event = self._build_event(
+            "POST",
+            "/comments",
+            body={"request_id": 20, "comment_text": "Request comment"},
+        )
+        result = comments.lambda_handler(event, None)
+
+        mock_crud.create.assert_not_called()
+        self.assertEqual(result["statusCode"], 401)
+        self.assertIn("Unable to resolve authenticated user", json.loads(result["body"])["error"])
+
+    @patch("functions.comments.main.Logger")
+    @patch("functions.comments.main.CrudUtils")
+    @patch("functions.comments.main.UserResolver")
     def test_post_comment_with_both_targets_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "user-1"
 
         body = {
-            "author_user_id": 1,
             "test_id": 10,
             "request_id": 20,
             "comment_text": "Invalid",
@@ -194,7 +212,6 @@ class TestCommentsMain(TestCase):
         mock_user_resolver.resolve.return_value = "user-1"
 
         body = {
-            "author_user_id": 1,
             "comment_text": "Invalid",
         }
         event = self._build_event("POST", "/comments", body=body)
@@ -217,7 +234,6 @@ class TestCommentsMain(TestCase):
             "/comments",
             query_params={
                 "comment_id": "1",
-                "author_user_id": "5",
                 "test_id": "10",
             },
         )
@@ -248,7 +264,6 @@ class TestCommentsMain(TestCase):
             "/comments",
             query_params={
                 "comment_id": "2",
-                "author_user_id": "5",
                 "request_id": "20",
             },
         )
@@ -289,8 +304,9 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.Logger")
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
-    def test_delete_comments_with_mismatched_author_user_id_returns_403(self, mock_user_resolver, mock_crud, mock_logger):
+    def test_delete_comments_ignores_query_author_user_id(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "5"
+        mock_crud.hard_delete.return_value = {"deleted": 1}
 
         event = self._build_event(
             "DELETE",
@@ -303,9 +319,12 @@ class TestCommentsMain(TestCase):
         )
         result = comments.lambda_handler(event, None)
 
-        mock_crud.hard_delete.assert_not_called()
-        self.assertEqual(result["statusCode"], 403)
-        self.assertIn("not authorized", json.loads(result["body"])["error"])
+        mock_crud.hard_delete.assert_called_once_with(
+            comments.TableNames.COMMENTS,
+            ["comment_id", "author_user_id", "request_id"],
+            ["2", "5", "20"],
+        )
+        self.assertEqual(result["statusCode"], 200)
 
     @patch("functions.comments.main.Logger")
     @patch("functions.comments.main.CrudUtils")
@@ -350,7 +369,6 @@ class TestCommentsMain(TestCase):
             message="Invalid delete target",
             extra_fields={
                 "comment_id": "1",
-                "author_user_id": "5",
                 "test_id": "10",
                 "request_id": "20",
             },
@@ -368,7 +386,6 @@ class TestCommentsMain(TestCase):
             "/comments",
             query_params={
                 "comment_id": "1",
-                "author_user_id": "5",
             },
         )
         result = comments.lambda_handler(event, None)
@@ -378,7 +395,6 @@ class TestCommentsMain(TestCase):
             message="Invalid delete target",
             extra_fields={
                 "comment_id": "1",
-                "author_user_id": "5",
                 "test_id": None,
                 "request_id": None,
             },
