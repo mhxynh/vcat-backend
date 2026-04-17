@@ -304,6 +304,34 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.Logger")
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
+    def test_delete_comments_not_owned_without_author_user_id_returns_404(self, mock_user_resolver, mock_crud, mock_logger):
+        mock_user_resolver.resolve.return_value = "5"
+        mock_crud.hard_delete.return_value = None
+
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "16",
+                "request_id": "20",
+            },
+        )
+        result = comments.lambda_handler(event, None)
+
+        mock_crud.hard_delete.assert_called_once_with(
+            comments.TableNames.COMMENTS,
+            ["comment_id", "author_user_id", "request_id"],
+            ["16", "5", "20"],
+        )
+        self.assertEqual(result["statusCode"], 404)
+        self.assertIn(
+            "not authorized",
+            json.loads(result["body"])["error"],
+        )
+
+    @patch("functions.comments.main.Logger")
+    @patch("functions.comments.main.CrudUtils")
+    @patch("functions.comments.main.UserResolver")
     def test_delete_comments_ignores_query_author_user_id(self, mock_user_resolver, mock_crud, mock_logger):
         mock_user_resolver.resolve.return_value = "5"
         mock_crud.hard_delete.return_value = {"deleted": 1}

@@ -21,9 +21,9 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Comments Function Started")
 
     try:
-        user_id = UserResolver.resolve(event)
+        actor_user_id = UserResolver.resolve(event)
         CrudUtils.set_audit_context(
-            user_id=user_id,
+            actor_user_id=actor_user_id,
         )
 
         method, path = ResponseUtils.get_method_and_path(event)
@@ -87,7 +87,7 @@ def lambda_handler(event, context):
                     {"error": "Missing required fields", "missing": missing},
                 )
 
-            if user_id is None:
+            if actor_user_id is None:
                 Logger.log(
                     level=LogLevels.ERROR,
                     message="Unable to resolve authenticated user for create",
@@ -113,7 +113,7 @@ def lambda_handler(event, context):
 
             columns = ["author_user_id", "test_id", "request_id", "comment_text"]
             values = [
-                user_id,
+                actor_user_id,
                 test_id,
                 request_id,
                 body.get("comment_text"),
@@ -161,7 +161,7 @@ def lambda_handler(event, context):
                     },
                 )
 
-            if user_id is None:
+            if actor_user_id is None:
                 Logger.log(
                     level=LogLevels.ERROR,
                     message="Unable to resolve authenticated user for delete",
@@ -172,7 +172,7 @@ def lambda_handler(event, context):
                     {"error": "Unable to resolve authenticated user"},
                 )
 
-            effective_author_user_id = str(user_id)
+            effective_author_user_id = str(actor_user_id)
 
             if test_id:
                 deleted = CrudUtils.hard_delete(
@@ -185,6 +185,22 @@ def lambda_handler(event, context):
                     TableNames.COMMENTS,
                     ["comment_id", "author_user_id", "request_id"],
                     [comment_id, effective_author_user_id, request_id],
+                )
+
+            if not deleted:
+                Logger.log(
+                    level=LogLevels.WARNING,
+                    message="Comment not found for authenticated user",
+                    extra_fields={
+                        "comment_id": comment_id,
+                        "authenticated_user_id": actor_user_id,
+                        "test_id": test_id,
+                        "request_id": request_id,
+                    },
+                )
+                return ResponseUtils.http_response(
+                    StatusCodes.NOT_FOUND,
+                    {"error": "Comment not found or not authorized to delete"},
                 )
 
             Logger.log(
