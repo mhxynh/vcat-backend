@@ -124,7 +124,7 @@ def lambda_handler(event, context):
 
         # DELETE /comments?comment_id=...&author_user_id=...&test_id=...
         # DELETE /comments?comment_id=...&author_user_id=...&request_id=...
-        # author_user_id is optional. Authenticated user is resolved from Cognito claims.
+        # author_user_id is optional. Authenticated user is resolved from Cognito claims
         if method == Methods.DELETE and normalized_path == "/comments":
             params = event.get("queryStringParameters", {}) or {}
             comment_id = params.get("comment_id")
