@@ -226,7 +226,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_by_test_id_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "5"
+        mock_user_resolver.resolve.return_value = 5
         mock_crud.hard_delete.return_value = {"deleted": 2}
 
         event = self._build_event(
@@ -242,7 +242,7 @@ class TestCommentsMain(TestCase):
         mock_crud.hard_delete.assert_called_once_with(
             comments.TableNames.COMMENTS,
             ["comment_id", "author_user_id", "test_id"],
-            ["1", "5", "10"],
+            ["1", 5, "10"],
         )
         mock_logger.log.assert_any_call(
             level="INFO",
@@ -256,7 +256,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_by_request_id_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "5"
+        mock_user_resolver.resolve.return_value = 5
         mock_crud.hard_delete.return_value = {"deleted": 1}
 
         event = self._build_event(
@@ -272,7 +272,7 @@ class TestCommentsMain(TestCase):
         mock_crud.hard_delete.assert_called_once_with(
             comments.TableNames.COMMENTS,
             ["comment_id", "author_user_id", "request_id"],
-            ["2", "5", "20"],
+            ["2", 5, "20"],
         )
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["deleted"], 1)
@@ -281,7 +281,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_without_author_user_id_uses_authenticated_user(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "5"
+        mock_user_resolver.resolve.return_value = 5
         mock_crud.hard_delete.return_value = {"deleted": 1}
 
         event = self._build_event(
@@ -297,7 +297,7 @@ class TestCommentsMain(TestCase):
         mock_crud.hard_delete.assert_called_once_with(
             comments.TableNames.COMMENTS,
             ["comment_id", "author_user_id", "request_id"],
-            ["2", "5", "20"],
+            ["2", 5, "20"],
         )
         self.assertEqual(result["statusCode"], 200)
 
@@ -305,7 +305,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_not_owned_without_author_user_id_returns_404(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "5"
+        mock_user_resolver.resolve.return_value = 5
         mock_crud.hard_delete.return_value = None
 
         event = self._build_event(
@@ -321,7 +321,7 @@ class TestCommentsMain(TestCase):
         mock_crud.hard_delete.assert_called_once_with(
             comments.TableNames.COMMENTS,
             ["comment_id", "author_user_id", "request_id"],
-            ["16", "5", "20"],
+            ["16", 5, "20"],
         )
         self.assertEqual(result["statusCode"], 404)
         self.assertIn(
@@ -333,7 +333,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_ignores_query_author_user_id(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "5"
+        mock_user_resolver.resolve.return_value = 5
         mock_crud.hard_delete.return_value = {"deleted": 1}
 
         event = self._build_event(
@@ -350,7 +350,7 @@ class TestCommentsMain(TestCase):
         mock_crud.hard_delete.assert_called_once_with(
             comments.TableNames.COMMENTS,
             ["comment_id", "author_user_id", "request_id"],
-            ["2", "5", "20"],
+            ["2", 5, "20"],
         )
         self.assertEqual(result["statusCode"], 200)
 
@@ -378,7 +378,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_with_both_targets_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "user-1"
+        mock_user_resolver.resolve.return_value = 5
 
         event = self._build_event(
             "DELETE",
@@ -407,7 +407,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_with_no_target_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "5"
+        mock_user_resolver.resolve.return_value = 5
 
         event = self._build_event(
             "DELETE",

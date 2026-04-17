@@ -172,7 +172,7 @@ def lambda_handler(event, context):
                     {"error": "Unable to resolve authenticated user"},
                 )
 
-            effective_author_user_id = str(actor_user_id)
+            effective_author_user_id = actor_user_id
 
             if test_id:
                 deleted = CrudUtils.hard_delete(
