@@ -96,7 +96,7 @@ test_data AS (
 INSERT INTO tests (
   request_id, control_id, assigned_tester_id, description,
   requires_dat, requires_oet, dat_step, oet_step, status, priority,
-  start_date, estimated_date, due_date, complete_date
+  start_date, estimated_date, due_date, complete_date, evidence_links
 )
 SELECT
   request_id,
@@ -128,7 +128,17 @@ SELECT
   CASE WHEN macro_status != 'NOT_STARTED' THEN current_date - 5 ELSE NULL END AS start_date,
   current_date + 5 AS estimated_date,
   current_date + 10 AS due_date,
-  CASE WHEN macro_status = 'COMPLETED' THEN current_date ELSE NULL END AS complete_date
+  CASE WHEN macro_status = 'COMPLETED' THEN current_date ELSE NULL END AS complete_date,
+  CASE
+    WHEN control_id % 5 = 0 THEN ARRAY[]::text[]
+    WHEN control_id % 3 = 0 THEN ARRAY[
+      format('https://evidence.vcat.local/tests/%s/dat-walkthrough', control_id),
+      format('https://evidence.vcat.local/tests/%s/oet-results', control_id)
+    ]::text[]
+    ELSE ARRAY[
+      format('https://evidence.vcat.local/tests/%s/main', control_id)
+    ]::text[]
+  END AS evidence_links
 
 FROM test_data;
 

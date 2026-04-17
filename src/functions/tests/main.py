@@ -94,6 +94,7 @@ def lambda_handler(event, context):
                 due_date=body["due_date"],
                 assigned_tester_id=body.get("assigned_tester_id"),
                 estimated_date=body.get("estimated_date"),
+                evidence_links=body.get("evidence_links"),
             )
 
             if not created:
@@ -148,6 +149,21 @@ def lambda_handler(event, context):
                 updated_record = TestRepository.review_test(test_id)
             elif action == "complete":
                 updated_record = TestRepository.complete_test(test_id)
+            elif action == "update_evidence_links":
+                if "evidence_links" not in body:
+                    return ResponseUtils.http_response(
+                        StatusCodes.BAD_REQUEST,
+                        {"error": "evidence_links is required"},
+                    )
+                evidence_links = body.get("evidence_links")
+                if not isinstance(evidence_links, list):
+                    return ResponseUtils.http_response(
+                        StatusCodes.BAD_REQUEST,
+                        {"error": "evidence_links must be a list"},
+                    )
+                updated_record = TestRepository.update_evidence_links(
+                    test_id, evidence_links
+                )
             elif action == "update_details":
                 updated_record = TestRepository.update_details(
                     test_id,
@@ -159,6 +175,7 @@ def lambda_handler(event, context):
                     body.get("due_date"),
                     body.get("estimated_date"),
                     body.get("description"),
+                    body.get("evidence_links"),
                 )
             else:
                 return ResponseUtils.http_response(

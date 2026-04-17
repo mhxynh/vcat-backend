@@ -187,7 +187,8 @@ INSERT INTO tests (
     requires_oet,
     due_date,
     estimated_date,
-    description
+    description,
+    evidence_links
 )
 VALUES (
     (SELECT control_id FROM controls WHERE vgcpid = %s),
@@ -197,6 +198,7 @@ VALUES (
     %s, 
     %s, 
     %s, 
+    %s,
     %s
 )
 RETURNING *;
@@ -277,6 +279,12 @@ RETURNING *;
 UPDATE tests
 SET status = 'COMPLETED',
     complete_date = current_date
+WHERE test_id = %s
+RETURNING *;
+
+-- Update hyperlinks in evidence_links array
+UPDATE tests
+SET evidence_links = %s
 WHERE test_id = %s
 RETURNING *;
 

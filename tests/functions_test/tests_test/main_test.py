@@ -226,6 +226,43 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 200)
         mock_repo.complete_test.assert_called_once()
 
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_evidence_links_returns_200(self, mock_repo):
+        mock_repo.update_evidence_links.return_value = {
+            "test_id": "42",
+            "evidence_links": ["https://example.com/evidence"],
+        }
+        event = self._build_event(
+            "PUT",
+            "/tests/42",
+            body={
+                "action": "update_evidence_links",
+                "evidence_links": ["https://example.com/evidence"],
+            },
+            path_params={"test_id": "42"},
+        )
+
+        result = tests_main.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        mock_repo.update_evidence_links.assert_called_once_with(
+            "42", ["https://example.com/evidence"]
+        )
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_evidence_links_missing_payload_returns_400(self, mock_repo):
+        event = self._build_event(
+            "PUT",
+            "/tests/42",
+            body={"action": "update_evidence_links"},
+            path_params={"test_id": "42"},
+        )
+
+        result = tests_main.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("evidence_links is required", json.loads(result["body"])["error"])
+
     def test_put_test_invalid_action_returns_400(self):
         event = self._build_event("PUT", "/tests/42", body={"action": "garbage_action"}, path_params={"test_id": "42"})
         result = tests_main.lambda_handler(event, None)
