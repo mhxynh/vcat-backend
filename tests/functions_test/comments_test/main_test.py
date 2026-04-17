@@ -209,7 +209,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_by_test_id_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "user-1"
+        mock_user_resolver.resolve.return_value = "5"
         mock_crud.hard_delete.return_value = {"deleted": 2}
 
         event = self._build_event(
@@ -240,7 +240,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_by_request_id_returns_200(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "user-1"
+        mock_user_resolver.resolve.return_value = "5"
         mock_crud.hard_delete.return_value = {"deleted": 1}
 
         event = self._build_event(
@@ -261,6 +261,71 @@ class TestCommentsMain(TestCase):
         )
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(json.loads(result["body"])["deleted"], 1)
+
+    @patch("functions.comments.main.Logger")
+    @patch("functions.comments.main.CrudUtils")
+    @patch("functions.comments.main.UserResolver")
+    def test_delete_comments_without_author_user_id_uses_authenticated_user(self, mock_user_resolver, mock_crud, mock_logger):
+        mock_user_resolver.resolve.return_value = "5"
+        mock_crud.hard_delete.return_value = {"deleted": 1}
+
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "2",
+                "request_id": "20",
+            },
+        )
+        result = comments.lambda_handler(event, None)
+
+        mock_crud.hard_delete.assert_called_once_with(
+            comments.TableNames.COMMENTS,
+            ["comment_id", "author_user_id", "request_id"],
+            ["2", "5", "20"],
+        )
+        self.assertEqual(result["statusCode"], 200)
+
+    @patch("functions.comments.main.Logger")
+    @patch("functions.comments.main.CrudUtils")
+    @patch("functions.comments.main.UserResolver")
+    def test_delete_comments_with_mismatched_author_user_id_returns_403(self, mock_user_resolver, mock_crud, mock_logger):
+        mock_user_resolver.resolve.return_value = "5"
+
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "2",
+                "author_user_id": "7",
+                "request_id": "20",
+            },
+        )
+        result = comments.lambda_handler(event, None)
+
+        mock_crud.hard_delete.assert_not_called()
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("not authorized", json.loads(result["body"])["error"])
+
+    @patch("functions.comments.main.Logger")
+    @patch("functions.comments.main.CrudUtils")
+    @patch("functions.comments.main.UserResolver")
+    def test_delete_comments_without_resolved_user_returns_401(self, mock_user_resolver, mock_crud, mock_logger):
+        mock_user_resolver.resolve.return_value = None
+
+        event = self._build_event(
+            "DELETE",
+            "/comments",
+            query_params={
+                "comment_id": "2",
+                "request_id": "20",
+            },
+        )
+        result = comments.lambda_handler(event, None)
+
+        mock_crud.hard_delete.assert_not_called()
+        self.assertEqual(result["statusCode"], 401)
+        self.assertIn("Unable to resolve authenticated user", json.loads(result["body"])["error"])
 
     @patch("functions.comments.main.Logger")
     @patch("functions.comments.main.CrudUtils")
@@ -296,7 +361,7 @@ class TestCommentsMain(TestCase):
     @patch("functions.comments.main.CrudUtils")
     @patch("functions.comments.main.UserResolver")
     def test_delete_comments_with_no_target_returns_400(self, mock_user_resolver, mock_crud, mock_logger):
-        mock_user_resolver.resolve.return_value = "user-1"
+        mock_user_resolver.resolve.return_value = "5"
 
         event = self._build_event(
             "DELETE",
