@@ -1,10 +1,14 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+import utils.s3_utils as s3_utils
 from utils.s3_utils import S3Utils
 
 
 class TestS3Utils(TestCase):
+	def setUp(self):
+		s3_utils._S3_CLIENT = None
+
 	# is_s3_event
 
 	def test_is_s3_event_returns_false_for_non_dict(self):
@@ -35,6 +39,18 @@ class TestS3Utils(TestCase):
 		self.assertEqual(args[0], "s3")
 		self.assertEqual(kwargs["config"].signature_version, "s3v4")
 
+	@patch("utils.s3_utils.boto3.client")
+	def test_get_client_returns_cached_singleton(self, mock_boto_client):
+		first_client = MagicMock()
+		mock_boto_client.return_value = first_client
+
+		client_one = S3Utils.get_client()
+		client_two = S3Utils.get_client()
+
+		self.assertIs(client_one, first_client)
+		self.assertIs(client_two, first_client)
+		mock_boto_client.assert_called_once()
+
 	# get_object_bytes
 
 	@patch("utils.s3_utils.S3Utils.get_client")
@@ -57,6 +73,7 @@ class TestS3Utils(TestCase):
 		self.assertEqual(content_type, "text/csv")
 		self.assertEqual(content_length, 10)
 		client.get_object.assert_called_once_with(Bucket="bucket", Key="key")
+		body.close.assert_called_once()
 
 	@patch("utils.s3_utils.S3Utils.get_client")
 	def test_get_object_bytes_uses_body_len_when_length_missing(self, mock_get_client):
@@ -76,6 +93,42 @@ class TestS3Utils(TestCase):
 		self.assertEqual(body_bytes, b"abcd")
 		self.assertEqual(content_type, "text/plain")
 		self.assertEqual(content_length, 4)
+		body.close.assert_called_once()
+
+	@patch("utils.s3_utils.S3Utils.get_client")
+	def test_get_object_bytes_fails_fast_when_content_length_exceeds_limit(
+		self, mock_get_client
+	):
+		body = MagicMock()
+		client = MagicMock()
+		client.get_object.return_value = {
+			"Body": body,
+			"ContentType": "text/csv",
+			"ContentLength": (2 * 1024 * 1024),
+		}
+		mock_get_client.return_value = client
+
+		with self.assertRaises(ValueError):
+			S3Utils.get_object_bytes("bucket", "key", max_file_size_mb=1)
+
+		body.read.assert_not_called()
+		body.close.assert_called_once()
+
+	@patch("utils.s3_utils.S3Utils.get_client")
+	def test_get_object_bytes_closes_body_when_read_raises(self, mock_get_client):
+		body = MagicMock()
+		body.read.side_effect = RuntimeError("stream read failed")
+		client = MagicMock()
+		client.get_object.return_value = {
+			"Body": body,
+			"ContentType": "text/csv",
+		}
+		mock_get_client.return_value = client
+
+		with self.assertRaises(RuntimeError):
+			S3Utils.get_object_bytes("bucket", "key")
+
+		body.close.assert_called_once()
 
 	# get_file_from_s3
 
@@ -87,19 +140,24 @@ class TestS3Utils(TestCase):
 
 		self.assertEqual(body_bytes, b"file-bytes")
 		self.assertEqual(content_type, "text/csv")
+		mock_get_object_bytes.assert_called_once_with(
+			"bucket", "key", max_file_size_mb=None
+		)
 
 	@patch("utils.s3_utils.S3Utils.get_object_bytes")
-	def test_get_file_from_s3_raises_when_content_length_exceeds_limit(
+	def test_get_file_from_s3_propagates_pre_read_size_validation(
 		self, mock_get_object_bytes
 	):
-		mock_get_object_bytes.return_value = (
-			b"small-body",
-			"text/csv",
-			(2 * 1024 * 1024),
+		mock_get_object_bytes.side_effect = ValueError(
+			"File exceeds the maximum supported size of 1 MB"
 		)
 
 		with self.assertRaises(ValueError):
 			S3Utils.get_file_from_s3("bucket", "key", max_file_size_mb=1)
+
+		mock_get_object_bytes.assert_called_once_with(
+			"bucket", "key", max_file_size_mb=1
+		)
 
 	@patch("utils.s3_utils.S3Utils.get_object_bytes")
 	def test_get_file_from_s3_with_limit_returns_when_under_limit(
@@ -114,6 +172,9 @@ class TestS3Utils(TestCase):
 
 		self.assertEqual(returned_body, body_bytes)
 		self.assertEqual(content_type, "text/csv")
+		mock_get_object_bytes.assert_called_once_with(
+			"bucket", "key", max_file_size_mb=1
+		)
 
 	@patch("utils.s3_utils.S3Utils.get_object_bytes")
 	def test_get_file_from_s3_raises_when_body_size_exceeds_limit(
@@ -124,6 +185,10 @@ class TestS3Utils(TestCase):
 
 		with self.assertRaises(ValueError):
 			S3Utils.get_file_from_s3("bucket", "key", max_file_size_mb=1)
+
+		mock_get_object_bytes.assert_called_once_with(
+			"bucket", "key", max_file_size_mb=1
+		)
 
 	# generate_presigned_put_url
 

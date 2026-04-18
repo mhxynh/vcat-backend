@@ -306,8 +306,8 @@ Resources:
             - 5
             - !Split [":", !Ref ImportUploadBucketArn]
           UPLOAD_KEY_PREFIX: control-metadata/
-          PRESIGNED_URL_TTL_SECONDS: 900
-          IMPORT_MAX_FILE_SIZE_MB: 20
+          PRESIGNED_URL_TTL_SECONDS: "900"
+          IMPORT_MAX_FILE_SIZE_MB: "20"
       Policies:
         - S3CrudPolicy:
             BucketName: !Select

@@ -326,29 +326,6 @@ def bulk_upsert_controls(control_rows):
     try:
         with connection.cursor() as cursor:
             input_vgcpids = [row[0] for row in control_rows]
-            cursor.execute(
-                """
-                    SELECT vgcpid
-                    FROM controls
-                    WHERE vgcpid = ANY(%s)
-                """,
-                (input_vgcpids,),
-            )
-            existing_vgcpid_set = {
-                vgcpid
-                for vgcpid in (
-                    get_vgcpid_from_db_row(db_row) for db_row in cursor.fetchall()
-                )
-                if vgcpid
-            }
-            existing_vgcpids = sorted(existing_vgcpid_set)
-
-            rows_to_insert = [
-                row for row in control_rows if row[0] not in existing_vgcpid_set
-            ]
-            if not rows_to_insert:
-                connection.commit()
-                return 0, existing_vgcpids
 
             query = """
                 INSERT INTO controls (
@@ -365,8 +342,18 @@ def bulk_upsert_controls(control_rows):
                 RETURNING vgcpid
             """
 
-            execute_values(cursor, query, rows_to_insert, page_size=500)
-            inserted_rows = len(cursor.fetchall())
+            execute_values(cursor, query, control_rows, page_size=500)
+
+            inserted_vgcpids = {
+                vgcpid
+                for vgcpid in (
+                    get_vgcpid_from_db_row(db_row) for db_row in cursor.fetchall()
+                )
+                if vgcpid
+            }
+            existing_vgcpids = sorted(set(input_vgcpids) - inserted_vgcpids)
+            inserted_rows = len(inserted_vgcpids)
+
             connection.commit()
             return inserted_rows, existing_vgcpids
     except Exception:
@@ -407,12 +394,7 @@ def process_import_file(bucket_name, object_key):
     if not deduped_valid_rows:
         raise ImportValidationError("No valid rows were found in the uploaded file")
 
-    insert_result = bulk_upsert_controls(deduped_valid_rows)
-    if isinstance(insert_result, tuple):
-        inserted_rows, existing_vgcpids = insert_result
-    else:
-        inserted_rows = insert_result
-        existing_vgcpids = []
+    inserted_rows, existing_vgcpids = bulk_upsert_controls(deduped_valid_rows)
 
     if existing_vgcpids:
         Logger.log(
@@ -434,7 +416,6 @@ def process_import_file(bucket_name, object_key):
         "duplicate_vgcpid_count": len(duplicate_vgcpids),
         "existing_vgcpid_count": len(existing_vgcpids),
         "invalid_rows": len(invalid_rows),
-        "upserted_rows": inserted_rows,
         "inserted_rows": inserted_rows,
         "invalid_row_samples": invalid_rows[:10],
     }
@@ -549,7 +530,7 @@ def lambda_handler(event, context):
     Logger.log(level=LogLevels.INFO, message="Import Function Started (API)")
 
     try:
-        if not event:
+        if event is None or (hasattr(event, "__len__") and len(event) == 0):
             Logger.log(level=LogLevels.ERROR, message="No event data provided")
             return ResponseUtils.http_response(
                 StatusCodes.BAD_REQUEST, {"error": "No event data provided"}
@@ -557,12 +538,6 @@ def lambda_handler(event, context):
 
         if event.get("httpMethod") == "OPTIONS":
             return ResponseUtils.cors_preflight()
-
-        if len(event) == 0:
-            Logger.log(level=LogLevels.ERROR, message="No event data provided")
-            return ResponseUtils.http_response(
-                StatusCodes.BAD_REQUEST, {"error": "No event data provided"}
-            )
 
         method, _ = ResponseUtils.get_method_and_path(event)
         method = (method or "").upper()

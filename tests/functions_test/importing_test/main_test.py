@@ -121,7 +121,7 @@ class TestImportingMain(TestCase):
             "VGCP-102,Control 102,Owner 2,,false,true,2026-04-03,\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
-        mock_upsert.return_value = 2
+        mock_upsert.return_value = (2, [])
 
         result = importing.lambda_handler(
             self._build_s3_event(key="control-metadata/controls.csv"), None
@@ -136,7 +136,8 @@ class TestImportingMain(TestCase):
         self.assertEqual(processed_file["total_rows"], 2)
         self.assertEqual(processed_file["valid_rows"], 2)
         self.assertEqual(processed_file["invalid_rows"], 0)
-        self.assertEqual(processed_file["upserted_rows"], 2)
+        self.assertEqual(processed_file["inserted_rows"], 2)
+        self.assertNotIn("upserted_rows", processed_file)
 
         inserted_rows = mock_upsert.call_args[0][0]
         self.assertEqual(inserted_rows[0][0], "VGCP-101")
@@ -153,7 +154,7 @@ class TestImportingMain(TestCase):
             "2,VGCP-05245,Procedure B,,SME B,No,Alan/Clara,notes,Completed,1/22/2025,2/10/2025\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
-        mock_upsert.return_value = 2
+        mock_upsert.return_value = (2, [])
 
         result = importing.lambda_handler(
             self._build_s3_event(key="control-metadata/Controls Tracker - Example.csv"),
@@ -193,7 +194,7 @@ class TestImportingMain(TestCase):
             "VGCP-202,Control 202,Owner 2,false\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
-        mock_upsert.return_value = 1
+        mock_upsert.return_value = (1, [])
 
         result = importing.lambda_handler(
             self._build_s3_event(key="control-metadata/controls.csv"), None
@@ -217,7 +218,7 @@ class TestImportingMain(TestCase):
             "VGCP-101,Control 101 Updated,Owner 2,false\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
-        mock_upsert.return_value = 1
+        mock_upsert.return_value = (1, [])
 
         result = importing.lambda_handler(
             self._build_s3_event(key="control-metadata/controls.csv"), None
@@ -257,8 +258,8 @@ class TestImportingMain(TestCase):
         self.assertEqual(processed_file["valid_rows"], 2)
         self.assertEqual(processed_file["deduped_valid_rows"], 2)
         self.assertEqual(processed_file["existing_vgcpid_count"], 2)
-        self.assertEqual(processed_file["upserted_rows"], 0)
         self.assertEqual(processed_file["inserted_rows"], 0)
+        self.assertNotIn("upserted_rows", processed_file)
 
     @patch("functions.importing.main.bulk_upsert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
@@ -276,7 +277,7 @@ class TestImportingMain(TestCase):
             }
         ).encode("utf-8")
         mock_get_file.return_value = (json_payload, "application/json")
-        mock_upsert.return_value = 1
+        mock_upsert.return_value = (1, [])
 
         result = importing.lambda_handler(
             self._build_s3_event(key="control-metadata/controls.json"), None
@@ -636,10 +637,7 @@ class TestImportingMain(TestCase):
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
 
-        cursor.fetchall.side_effect = [
-            [{"vgcpid": "VGCP-101"}],
-            [{"vgcpid": "VGCP-102"}],
-        ]
+        cursor.fetchall.return_value = [{"vgcpid": "VGCP-102"}]
 
         inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
             [
@@ -652,8 +650,9 @@ class TestImportingMain(TestCase):
         self.assertEqual(existing_vgcpids, ["VGCP-101"])
 
         execute_values_rows = mock_execute_values.call_args[0][2]
-        self.assertEqual(len(execute_values_rows), 1)
-        self.assertEqual(execute_values_rows[0][0], "VGCP-102")
+        self.assertEqual(len(execute_values_rows), 2)
+        self.assertEqual(execute_values_rows[0][0], "VGCP-101")
+        self.assertEqual(execute_values_rows[1][0], "VGCP-102")
 
     # DB insert helper behavior
 
@@ -666,7 +665,7 @@ class TestImportingMain(TestCase):
         cursor = MagicMock()
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
-        cursor.fetchall.return_value = [{"vgcpid": "VGCP-101"}]
+        cursor.fetchall.return_value = []
 
         inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
             [self._build_control_row("VGCP-101")]
@@ -674,7 +673,7 @@ class TestImportingMain(TestCase):
 
         self.assertEqual(inserted_rows, 0)
         self.assertEqual(existing_vgcpids, ["VGCP-101"])
-        mock_execute_values.assert_not_called()
+        mock_execute_values.assert_called_once()
 
     def test_get_vgcpid_from_db_row_supports_tuple_rows(self):
         self.assertEqual(importing.get_vgcpid_from_db_row(("VGCP-101",)), "VGCP-101")
