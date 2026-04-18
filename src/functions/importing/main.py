@@ -204,11 +204,7 @@ def to_control_tuple(raw_row, row_number):
 
     vgcpid = str(row.get("vgcpid", "")).strip()
     description = str(row.get("description", "")).strip()
-    control_owner = str(
-        row.get("control_owner")
-        or row.get("tester")
-        or ""
-    ).strip()
+    control_owner = str(row.get("control_owner") or row.get("tester") or "").strip()
     control_sme = row.get("control_sme")
     control_sme = None if control_sme is None else str(control_sme).strip() or None
 
@@ -227,8 +223,7 @@ def to_control_tuple(raw_row, row_number):
             row.get("is_active"), default_value=True, field_name="is_active"
         )
         date_created = (
-            parse_optional_date(row.get("date_created"), "date_created")
-            or date.today()
+            parse_optional_date(row.get("date_created"), "date_created") or date.today()
         )
         last_tested = parse_optional_date(row.get("last_tested"), "last_tested")
     except ImportValidationError as e:
@@ -250,9 +245,7 @@ def parse_csv_rows(file_bytes):
     try:
         decoded_csv = file_bytes.decode("utf-8-sig")
     except UnicodeDecodeError as e:
-        raise ImportValidationError(
-            "CSV file must be UTF-8 encoded"
-        ) from e
+        raise ImportValidationError("CSV file must be UTF-8 encoded") from e
 
     csv_rows = list(csv.reader(io.StringIO(decoded_csv)))
     if not csv_rows:
@@ -261,7 +254,8 @@ def parse_csv_rows(file_bytes):
     header_row_index = find_header_row_index(csv_rows)
     if header_row_index is None:
         raise ImportValidationError(
-            "CSV header row was not found. Expected columns like 'VGCP ID' and 'Procedure Name'."
+            "CSV header row was not found. Expected columns like "
+            "'VGCP ID' and 'Procedure Name'."
         )
 
     header_row = csv_rows[header_row_index]
@@ -479,7 +473,9 @@ def process_s3_event(event):
 
     if retryable_failures:
         raise RuntimeError(
-            f"Failed to process {len(retryable_failures)} import file(s) due to retryable errors"
+            "Failed to process "
+            f"{len(retryable_failures)} import file(s) "
+            "due to retryable errors"
         )
 
     summary = {
