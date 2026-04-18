@@ -332,6 +332,28 @@ class TestImportingMain(TestCase):
             date_created,
             last_tested,
         )
+    
+    # Get Environment
+
+    def test_get_int_env_returns_default_value(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                importing.get_int_env("IMPORT_MAX_FILE_SIZE_MB", 20),
+                20,
+            )
+
+    def test_get_int_env_var_exception(self):
+        with patch.dict(
+            os.environ,
+            {"IMPORT_MAX_FILE_SIZE_MB": "not-an-int"},
+            clear=True,
+        ):
+            self.assertEqual(
+                importing.get_int_env("IMPORT_MAX_FILE_SIZE_MB", 20),
+                20,
+            )
+    
+    # File format resolution
 
     def test_resolve_file_format_uses_extension_or_content_type(self):
         self.assertEqual(importing.resolve_file_format("controls.csv"), "csv")
@@ -363,16 +385,40 @@ class TestImportingMain(TestCase):
             r"^control-metadata/\d{8}T\d{6}Z-[0-9a-f]{32}-Controls_Tracker\.csv$",
         )
 
+    def test_build_upload_key_missing_safe_filename(self):
+        with patch.dict(
+            os.environ,
+            {
+                "UPLOAD_KEY_PREFIX": "control-metadata/",
+            },
+            clear=True,
+        ):
+            key = importing.build_upload_key("..\\..\\secret.txt", "txt")
+
+        self.assertTrue(key.startswith("control-metadata/"))
+        self.assertTrue(key.endswith("-secret.txt"))
+        self.assertNotIn("..", key)
+
+    # Boolean parsing
+
+    def test_parse_boolean_accepts_true_and_false_strings(self):
+        self.assertTrue(importing.parse_boolean("true", False, "escalation"))
+        self.assertFalse(importing.parse_boolean("false", True, "escalation"))
+
+    def test_parse_boolean_accepts_int_values(self):
+        self.assertTrue(importing.parse_boolean(1, False, "escalation"))
+        self.assertFalse(importing.parse_boolean(0, True, "escalation"))
+
     def test_parse_boolean_accepts_case_insensitive_values(self):
         self.assertTrue(importing.parse_boolean("TRUE", False, "escalation"))
         self.assertFalse(importing.parse_boolean("No", True, "escalation"))
         self.assertTrue(importing.parse_boolean("  y  ", False, "escalation"))
 
-    # Boolean parsing
-
     def test_parse_boolean_rejects_unknown_values(self):
         with self.assertRaises(ImportValidationError):
             importing.parse_boolean("maybe", False, "escalation")
+
+    # Date parsing
 
     def test_parse_optional_date_supports_multiple_formats(self):
         self.assertEqual(
@@ -430,6 +476,23 @@ class TestImportingMain(TestCase):
         self.assertEqual(row_number, 3)
         self.assertEqual(row["VGCP ID"], "VGCP-01054")
         self.assertEqual(row["Procedure Name"], "Procedure A")
+
+    def test_parse_csv_rows_unicode_decoding_error(self):
+        invalid_csv_payload = b"\xff\xfe\x00\x00"  # Invalid UTF-8 bytes
+        with self.assertRaises(ImportValidationError):
+            importing.parse_csv_rows(invalid_csv_payload)
+
+    def test_parse_csv_rows_missing_csv_rows(self):
+        csv_payload = "This is not a valid CSV file".encode("utf-8")
+        with self.assertRaises(ImportValidationError):
+            importing.parse_csv_rows(csv_payload)
+
+    def test_parse_csv_rows_missing_header(self):
+        csv_payload = (
+            "This is not a valid CSV file without headers".encode("utf-8")
+        )
+        with self.assertRaises(ImportValidationError):
+            importing.parse_csv_rows(csv_payload)
 
     def test_validate_and_transform_rows_separates_valid_and_invalid(self):
         rows = [
@@ -526,3 +589,19 @@ class TestImportingMain(TestCase):
         self.assertEqual(inserted_rows, 0)
         self.assertEqual(existing_vgcpids, ["VGCP-101"])
         mock_execute_values.assert_not_called()
+
+    # To Control Tuple conversion
+
+    def test_to_control_tuple_exception(self):
+        with self.assertRaises(ImportValidationError) as ctx:
+            importing.to_control_tuple(
+                {
+                    "vgcpid": "VGCP-101",
+                    "description": "Control 101",
+                    "control_owner": "Owner 1",
+                    "escalation": "notaboolean",
+                },
+                2,
+            )
+
+        self.assertIn("Row 2:", str(ctx.exception))
