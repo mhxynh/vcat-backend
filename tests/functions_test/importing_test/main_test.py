@@ -352,6 +352,17 @@ class TestImportingMain(TestCase):
                 importing.get_int_env("IMPORT_MAX_FILE_SIZE_MB", 20),
                 20,
             )
+
+    def test_get_int_env_returns_default_when_value_below_minimum(self):
+        with patch.dict(
+            os.environ,
+            {"IMPORT_MAX_FILE_SIZE_MB": "0"},
+            clear=True,
+        ):
+            self.assertEqual(
+                importing.get_int_env("IMPORT_MAX_FILE_SIZE_MB", 20, minimum=1),
+                20,
+            )
     
     # File format resolution
 
@@ -399,6 +410,21 @@ class TestImportingMain(TestCase):
         self.assertTrue(key.endswith("-secret.txt"))
         self.assertNotIn("..", key)
 
+    def test_build_upload_key_uses_fallback_filename_without_prefix(self):
+        with patch.dict(
+            os.environ,
+            {
+                "UPLOAD_KEY_PREFIX": "",
+            },
+            clear=True,
+        ):
+            key = importing.build_upload_key("   ", "csv")
+
+        self.assertRegex(
+            key,
+            r"^\d{8}T\d{6}Z-[0-9a-f]{32}-controls-metadata\.csv$",
+        )
+
     # Boolean parsing
 
     def test_parse_boolean_accepts_true_and_false_strings(self):
@@ -408,6 +434,10 @@ class TestImportingMain(TestCase):
     def test_parse_boolean_accepts_int_values(self):
         self.assertTrue(importing.parse_boolean(1, False, "escalation"))
         self.assertFalse(importing.parse_boolean(0, True, "escalation"))
+
+    def test_parse_boolean_accepts_bool_values(self):
+        self.assertTrue(importing.parse_boolean(True, False, "escalation"))
+        self.assertFalse(importing.parse_boolean(False, True, "escalation"))
 
     def test_parse_boolean_accepts_case_insensitive_values(self):
         self.assertTrue(importing.parse_boolean("TRUE", False, "escalation"))
@@ -434,6 +464,21 @@ class TestImportingMain(TestCase):
             date(2026, 4, 10),
         )
 
+    def test_parse_optional_date_accepts_date_instance(self):
+        value = date(2026, 4, 10)
+        self.assertEqual(importing.parse_optional_date(value, "last_tested"), value)
+
+    def test_parse_optional_date_handles_iso_datetime_value(self):
+        self.assertEqual(
+            importing.parse_optional_date("2026-04-10T14:30:00Z", "last_tested"),
+            date(2026, 4, 10),
+        )
+
+    def test_parse_optional_date_day_month_uses_current_year(self):
+        parsed = importing.parse_optional_date("10-Apr", "last_tested")
+        self.assertEqual(parsed.month, 4)
+        self.assertEqual(parsed.day, 10)
+
     @patch("functions.importing.main.Logger.log")
     def test_parse_optional_date_returns_none_for_unparseable_values(self, mock_log):
         self.assertIsNone(importing.parse_optional_date("not-a-date", "last_tested"))
@@ -455,6 +500,17 @@ class TestImportingMain(TestCase):
         self.assertEqual(normalized["description"], "Procedure A")
         self.assertEqual(normalized["control_owner"], "Jason")
         self.assertEqual(normalized["escalation"], "Yes")
+
+    def test_normalize_row_keys_ignores_none_keys(self):
+        normalized = importing.normalize_row_keys(
+            {
+                None: "ignore-me",
+                "VGCP ID": "VGCP-01054",
+            }
+        )
+
+        self.assertEqual(normalized["vgcpid"], "VGCP-01054")
+        self.assertEqual(len(normalized), 1)
 
     def test_find_header_row_index_detects_tracker_header(self):
         rows = [
@@ -493,6 +549,36 @@ class TestImportingMain(TestCase):
         )
         with self.assertRaises(ImportValidationError):
             importing.parse_csv_rows(csv_payload)
+
+    def test_parse_csv_rows_empty_file_raises_validation_error(self):
+        with self.assertRaises(ImportValidationError):
+            importing.parse_csv_rows(b"")
+
+    def test_parse_csv_rows_ignores_blank_header_cells(self):
+        csv_payload = (
+            ",VGCP ID,Procedure Name,Control Owner\n"
+            ",VGCP-01054,Procedure A,Jason\n"
+        ).encode("utf-8")
+
+        rows = importing.parse_csv_rows(csv_payload)
+        self.assertEqual(len(rows), 1)
+        _, row = rows[0]
+        self.assertNotIn("", row)
+
+    def test_parse_csv_rows_skips_empty_data_rows(self):
+        csv_payload = (
+            "VGCP ID,Procedure Name,Control Owner\n"
+            ",,\n"
+            "VGCP-01054,Procedure A,Jason\n"
+        ).encode("utf-8")
+
+        rows = importing.parse_csv_rows(csv_payload)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], 3)
+
+    def test_parse_metadata_rows_rejects_unsupported_format(self):
+        with self.assertRaises(ImportValidationError):
+            importing.parse_metadata_rows(b"{}", "json")
 
     def test_validate_and_transform_rows_separates_valid_and_invalid(self):
         rows = [
@@ -590,6 +676,30 @@ class TestImportingMain(TestCase):
         self.assertEqual(existing_vgcpids, ["VGCP-101"])
         mock_execute_values.assert_not_called()
 
+    def test_get_vgcpid_from_db_row_supports_tuple_rows(self):
+        self.assertEqual(importing.get_vgcpid_from_db_row(("VGCP-101",)), "VGCP-101")
+
+    def test_bulk_upsert_controls_returns_zero_for_empty_input(self):
+        self.assertEqual(importing.bulk_upsert_controls([]), (0, []))
+
+    @patch("functions.importing.main.execute_values")
+    @patch("functions.importing.main.DbUtils.get_db_connection")
+    def test_bulk_upsert_controls_rolls_back_on_exception(
+        self, mock_get_db_connection, mock_execute_values
+    ):
+        connection = MagicMock()
+        cursor = MagicMock()
+        mock_get_db_connection.return_value = connection
+        connection.cursor.return_value.__enter__.return_value = cursor
+
+        cursor.fetchall.return_value = []
+        mock_execute_values.side_effect = Exception("insert failed")
+
+        with self.assertRaises(Exception):
+            importing.bulk_upsert_controls([self._build_control_row("VGCP-101")])
+
+        connection.rollback.assert_called_once()
+
     # To Control Tuple conversion
 
     def test_to_control_tuple_exception(self):
@@ -605,3 +715,108 @@ class TestImportingMain(TestCase):
             )
 
         self.assertIn("Row 2:", str(ctx.exception))
+
+    def test_to_control_tuple_requires_vgcpid(self):
+        with self.assertRaises(ImportValidationError) as ctx:
+            importing.to_control_tuple(
+                {
+                    "description": "Control 101",
+                    "control_owner": "Owner 1",
+                },
+                2,
+            )
+
+        self.assertIn("vgcpid is required", str(ctx.exception))
+
+    def test_to_control_tuple_requires_control_owner(self):
+        with self.assertRaises(ImportValidationError) as ctx:
+            importing.to_control_tuple(
+                {
+                    "vgcpid": "VGCP-101",
+                    "description": "Control 101",
+                    "control_owner": "",
+                    "tester": "",
+                },
+                2,
+            )
+
+        self.assertIn("control_owner is required", str(ctx.exception))
+
+    # Process helper behavior
+
+    @patch("functions.importing.main.S3Utils.get_file_from_s3")
+    def test_process_import_file_wraps_s3_value_error(self, mock_get_file):
+        mock_get_file.side_effect = ValueError("too large")
+
+        with self.assertRaises(ImportValidationError) as ctx:
+            importing.process_import_file("imports-bucket", "control-metadata/file.csv")
+
+        self.assertIn("too large", str(ctx.exception))
+
+    @patch("functions.importing.main.S3Utils.get_file_from_s3")
+    def test_process_import_file_raises_when_no_valid_rows(self, mock_get_file):
+        csv_payload = (
+            "vgcpid,description,control_owner\n"
+            "VGCP-101,,Owner 1\n"
+        ).encode("utf-8")
+        mock_get_file.return_value = (csv_payload, "text/csv")
+
+        with self.assertRaises(ImportValidationError) as ctx:
+            importing.process_import_file("imports-bucket", "control-metadata/file.csv")
+
+        self.assertIn("No valid rows", str(ctx.exception))
+
+    # process_s3_event helper behavior
+
+    def test_process_s3_event_ignores_non_s3_records(self):
+        event = {"Records": [{"eventSource": "aws:sns"}]}
+        result = importing.process_s3_event(event)
+
+        self.assertEqual(result["statusCode"], 200)
+        body = json.loads(result["body"])
+        self.assertEqual(body["processed_count"], 0)
+        self.assertEqual(body["skipped_count"], 0)
+
+    def test_process_s3_event_skips_missing_bucket_or_key(self):
+        event = {
+            "Records": [
+                {
+                    "eventSource": "aws:s3",
+                    "s3": {
+                        "bucket": {},
+                        "object": {},
+                    },
+                }
+            ]
+        }
+        result = importing.process_s3_event(event)
+
+        self.assertEqual(result["statusCode"], 200)
+        body = json.loads(result["body"])
+        self.assertEqual(body["processed_count"], 0)
+        self.assertEqual(body["skipped_count"], 1)
+        self.assertIn("Missing S3 bucket", body["skipped_files"][0]["error"])
+
+    # API edge behavior
+
+    def test_lambda_handler_none_event_returns_400(self):
+        result = importing.lambda_handler(None, None)
+        self.assertEqual(result["statusCode"], 400)
+
+    @patch("functions.importing.main.ResponseUtils.cors_preflight")
+    def test_lambda_handler_options_returns_cors_preflight(self, mock_cors_preflight):
+        mock_cors_preflight.return_value = {"statusCode": 200}
+
+        result = importing.lambda_handler({"httpMethod": "OPTIONS"}, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        mock_cors_preflight.assert_called_once()
+
+    def test_lambda_handler_truthy_empty_event_returns_400(self):
+        class TruthyEmptyDict(dict):
+            def __bool__(self):
+                return True
+
+        result = importing.lambda_handler(TruthyEmptyDict(), None)
+
+        self.assertEqual(result["statusCode"], 400)
