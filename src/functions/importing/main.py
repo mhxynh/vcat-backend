@@ -95,7 +95,8 @@ def build_upload_key(filename, file_format):
     if normalized_prefix:
         normalized_prefix = f"{normalized_prefix}/"
 
-    safe_filename = os.path.basename(filename or "").strip().replace(" ", "_")
+    normalized_filename = (filename or "").replace("\\", "/")
+    safe_filename = os.path.basename(normalized_filename).strip().replace(" ", "_")
     if not safe_filename:
         safe_filename = f"controls-metadata.{file_format}"
 
