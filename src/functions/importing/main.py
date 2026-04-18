@@ -312,6 +312,12 @@ def dedupe_control_rows_by_vgcpid(control_rows):
     return list(rows_by_vgcpid.values()), sorted(duplicate_vgcpids)
 
 
+def get_vgcpid_from_db_row(db_row):
+    if isinstance(db_row, dict):
+        return db_row.get("vgcpid")
+    return db_row[0]
+
+
 def bulk_upsert_controls(control_rows):
     if not control_rows:
         return 0, []
@@ -328,7 +334,13 @@ def bulk_upsert_controls(control_rows):
                 """,
                 (input_vgcpids,),
             )
-            existing_vgcpid_set = {row[0] for row in cursor.fetchall()}
+            existing_vgcpid_set = {
+                vgcpid
+                for vgcpid in (
+                    get_vgcpid_from_db_row(db_row) for db_row in cursor.fetchall()
+                )
+                if vgcpid
+            }
             existing_vgcpids = sorted(existing_vgcpid_set)
 
             rows_to_insert = [

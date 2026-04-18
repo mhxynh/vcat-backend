@@ -488,8 +488,8 @@ class TestImportingMain(TestCase):
         connection.cursor.return_value.__enter__.return_value = cursor
 
         cursor.fetchall.side_effect = [
-            [("VGCP-101",)],
-            [("VGCP-102",)],
+            [{"vgcpid": "VGCP-101"}],
+            [{"vgcpid": "VGCP-102"}],
         ]
 
         inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
@@ -517,7 +517,7 @@ class TestImportingMain(TestCase):
         cursor = MagicMock()
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
-        cursor.fetchall.return_value = [("VGCP-101",)]
+        cursor.fetchall.return_value = [{"vgcpid": "VGCP-101"}]
 
         inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
             [self._build_control_row("VGCP-101")]
