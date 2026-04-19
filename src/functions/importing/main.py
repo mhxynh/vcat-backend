@@ -1,6 +1,5 @@
 import csv
 import io
-import json
 import os
 import re
 import uuid
@@ -54,6 +53,20 @@ FIELD_ALIASES = {
     "date_started": "date_created",
     "last_tested": "last_tested",
     "date_completed": "last_tested",
+}
+
+ALLOWED_CSV_COLUMNS = {
+    "vgcpid",
+    "description",
+    "control_owner",
+    "control_sme",
+    "escalation",
+}
+
+REQUIRED_CSV_COLUMNS = {
+    "vgcpid",
+    "description",
+    "control_owner",
 }
 
 
@@ -203,6 +216,31 @@ def find_header_row_index(csv_rows):
     return None
 
 
+def validate_csv_header_row(header_row):
+    canonical_columns = set()
+    for cell in header_row:
+        normalized = normalize_header_key(cell)
+        if not normalized:
+            continue
+        canonical_columns.add(FIELD_ALIASES.get(normalized, normalized))
+
+    unexpected_columns = sorted(canonical_columns - ALLOWED_CSV_COLUMNS)
+    if unexpected_columns:
+        raise ImportValidationError(
+            "CSV contains unsupported columns: "
+            + ", ".join(unexpected_columns)
+            + ". Supported columns are: VGCP ID, Procedure Name, Control Owner, "
+            + "Control SME, Escalation Needed? (Yes / No)."
+        )
+
+    missing_required_columns = sorted(REQUIRED_CSV_COLUMNS - canonical_columns)
+    if missing_required_columns:
+        raise ImportValidationError(
+            "CSV header is missing required columns: "
+            + ", ".join(missing_required_columns)
+        )
+
+
 def to_control_tuple(raw_row, row_number):
     row = normalize_row_keys(raw_row)
 
@@ -263,6 +301,7 @@ def parse_csv_rows(file_bytes):
         )
 
     header_row = csv_rows[header_row_index]
+    validate_csv_header_row(header_row)
     data_rows = csv_rows[header_row_index + 1 :]
 
     rows = []
@@ -482,11 +521,7 @@ def process_s3_event(event):
         "processed_count": len(processed),
         "skipped_count": len(non_retryable_failures),
     }
-
-    return {
-        "statusCode": StatusCodes.OK,
-        "body": json.dumps(summary, default=ResponseUtils.default_serializer),
-    }
+    return summary
 
 
 def build_presigned_upload_response(body):

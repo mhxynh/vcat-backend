@@ -116,9 +116,9 @@ class TestImportingMain(TestCase):
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_processes_csv_and_upserts(self, mock_get_file, mock_upsert):
         csv_payload = (
-            "vgcpid,description,control_owner,control_sme,escalation,is_active,date_created,last_tested\n"
-            "VGCP-101,Control 101,Owner 1,SME 1,true,true,2026-04-01,2026-04-02\n"
-            "VGCP-102,Control 102,Owner 2,,false,true,2026-04-03,\n"
+            "VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "VGCP-101,Control 101,Owner 1,SME 1,true\n"
+            "VGCP-102,Control 102,Owner 2,,false\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
         mock_upsert.return_value = (2, [])
@@ -127,8 +127,7 @@ class TestImportingMain(TestCase):
             self._build_s3_event(key="control-metadata/controls.csv"), None
         )
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         self.assertEqual(body["processed_count"], 1)
         self.assertEqual(body["skipped_count"], 0)
 
@@ -142,11 +141,15 @@ class TestImportingMain(TestCase):
         inserted_rows = mock_upsert.call_args[0][0]
         self.assertEqual(inserted_rows[0][0], "VGCP-101")
         self.assertEqual(inserted_rows[0][4], True)
-        self.assertEqual(inserted_rows[0][6], date(2026, 4, 1))
+        self.assertEqual(inserted_rows[0][5], True)
+        self.assertIsInstance(inserted_rows[0][6], date)
+        self.assertIsNone(inserted_rows[0][7])
 
     @patch("functions.importing.main.bulk_upsert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
-    def test_s3_event_processes_tracker_style_csv(self, mock_get_file, mock_upsert):
+    def test_s3_event_rejects_tracker_style_csv_with_unsupported_columns(
+        self, mock_get_file, mock_upsert
+    ):
         csv_payload = (
             ",,Controls,,,,,,Testing Details\n"
             "Ref,VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No),Tester,Column1,DAT Status,Date Started,Date Completed\n"
@@ -154,34 +157,17 @@ class TestImportingMain(TestCase):
             "2,VGCP-05245,Procedure B,,SME B,No,Alan/Clara,notes,Completed,1/22/2025,2/10/2025\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
-        mock_upsert.return_value = (2, [])
 
         result = importing.lambda_handler(
             self._build_s3_event(key="control-metadata/Controls Tracker - Example.csv"),
             None,
         )
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
-        self.assertEqual(body["processed_count"], 1)
-
-        inserted_rows = mock_upsert.call_args[0][0]
-        self.assertEqual(len(inserted_rows), 2)
-
-        first_row = inserted_rows[0]
-        self.assertEqual(first_row[0], "VGCP-01054")
-        self.assertEqual(first_row[1], "Procedure A")
-        self.assertEqual(first_row[2], "Jason")
-        self.assertEqual(first_row[3], None)
-        self.assertEqual(first_row[4], False)
-        self.assertEqual(first_row[6], date(2025, 1, 31))
-        self.assertEqual(first_row[7], date(2025, 2, 7))
-
-        second_row = inserted_rows[1]
-        self.assertEqual(second_row[0], "VGCP-05245")
-        self.assertEqual(second_row[2], "Alan/Clara")
-        self.assertEqual(second_row[3], "SME B")
-        self.assertEqual(second_row[4], False)
+        body = result
+        self.assertEqual(body["processed_count"], 0)
+        self.assertEqual(body["skipped_count"], 1)
+        self.assertIn("unsupported columns", body["skipped_files"][0]["error"].lower())
+        mock_upsert.assert_not_called()
 
     @patch("functions.importing.main.bulk_upsert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
@@ -200,8 +186,7 @@ class TestImportingMain(TestCase):
             self._build_s3_event(key="control-metadata/controls.csv"), None
         )
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         processed_file = body["processed_files"][0]
         self.assertEqual(processed_file["valid_rows"], 1)
         self.assertEqual(processed_file["invalid_rows"], 1)
@@ -224,8 +209,7 @@ class TestImportingMain(TestCase):
             self._build_s3_event(key="control-metadata/controls.csv"), None
         )
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         processed_file = body["processed_files"][0]
         self.assertEqual(processed_file["valid_rows"], 2)
         self.assertEqual(processed_file["deduped_valid_rows"], 1)
@@ -252,8 +236,7 @@ class TestImportingMain(TestCase):
             self._build_s3_event(key="control-metadata/controls.csv"), None
         )
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         processed_file = body["processed_files"][0]
         self.assertEqual(processed_file["valid_rows"], 2)
         self.assertEqual(processed_file["deduped_valid_rows"], 2)
@@ -283,8 +266,7 @@ class TestImportingMain(TestCase):
             self._build_s3_event(key="control-metadata/controls.json"), None
         )
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         self.assertEqual(body["processed_count"], 0)
         self.assertEqual(body["skipped_count"], 1)
         self.assertEqual(len(body["skipped_files"]), 1)
@@ -299,8 +281,7 @@ class TestImportingMain(TestCase):
 
         result = importing.lambda_handler(self._build_s3_event(), None)
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         self.assertEqual(body["processed_count"], 0)
         self.assertEqual(body["skipped_count"], 1)
 
@@ -530,8 +511,8 @@ class TestImportingMain(TestCase):
     def test_parse_csv_rows_extracts_rows_after_detected_header(self):
         csv_payload = (
             ",,Controls\n"
-            "Ref,VGCP ID,Procedure Name,Control Owner\n"
-            "1,VGCP-01054,Procedure A,Jason\n"
+            "VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "VGCP-01054,Procedure A,Jason,,Yes\n"
         ).encode("utf-8")
 
         rows = importing.parse_csv_rows(csv_payload)
@@ -540,6 +521,17 @@ class TestImportingMain(TestCase):
         self.assertEqual(row_number, 3)
         self.assertEqual(row["VGCP ID"], "VGCP-01054")
         self.assertEqual(row["Procedure Name"], "Procedure A")
+
+    def test_parse_csv_rows_rejects_unsupported_headers(self):
+        csv_payload = (
+            "VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No),Ref\n"
+            "VGCP-01054,Procedure A,Jason,,Yes,1\n"
+        ).encode("utf-8")
+
+        with self.assertRaises(ImportValidationError) as ctx:
+            importing.parse_csv_rows(csv_payload)
+
+        self.assertIn("unsupported columns", str(ctx.exception).lower())
 
     def test_parse_csv_rows_unicode_decoding_error(self):
         invalid_csv_payload = b"\xff\xfe\x00\x00"  # Invalid UTF-8 bytes
@@ -778,8 +770,7 @@ class TestImportingMain(TestCase):
         event = {"Records": [{"eventSource": "aws:sns"}]}
         result = importing.process_s3_event(event)
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         self.assertEqual(body["processed_count"], 0)
         self.assertEqual(body["skipped_count"], 0)
 
@@ -797,8 +788,7 @@ class TestImportingMain(TestCase):
         }
         result = importing.process_s3_event(event)
 
-        self.assertEqual(result["statusCode"], 200)
-        body = json.loads(result["body"])
+        body = result
         self.assertEqual(body["processed_count"], 0)
         self.assertEqual(body["skipped_count"], 1)
         self.assertIn("Missing S3 bucket", body["skipped_files"][0]["error"])
