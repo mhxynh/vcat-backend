@@ -130,6 +130,9 @@ def parse_optional_date(value, field_name):
     if value is None:
         return None
 
+    if isinstance(value, datetime):
+        return value.date()
+
     if isinstance(value, date):
         return value
 

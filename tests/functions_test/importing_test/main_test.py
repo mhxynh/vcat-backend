@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import date, datetime
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -469,6 +469,13 @@ class TestImportingMain(TestCase):
         value = date(2026, 4, 10)
         self.assertEqual(importing.parse_optional_date(value, "last_tested"), value)
 
+    def test_parse_optional_date_converts_datetime_instance_to_date(self):
+        value = datetime(2026, 4, 10, 14, 30, 0)
+        parsed = importing.parse_optional_date(value, "last_tested")
+
+        self.assertEqual(parsed, date(2026, 4, 10))
+        self.assertFalse(isinstance(parsed, datetime))
+
     def test_parse_optional_date_handles_iso_datetime_value(self):
         self.assertEqual(
             importing.parse_optional_date("2026-04-10T14:30:00Z", "last_tested"),
@@ -637,7 +644,7 @@ class TestImportingMain(TestCase):
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
 
-        cursor.fetchall.return_value = [{"vgcpid": "VGCP-102"}]
+        cursor.fetchall.return_value = [{"vgcpid": "VGCP-101"}]
 
         inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
             [
@@ -647,7 +654,7 @@ class TestImportingMain(TestCase):
         )
 
         self.assertEqual(inserted_rows, 1)
-        self.assertEqual(existing_vgcpids, ["VGCP-101"])
+        self.assertEqual(existing_vgcpids, ["VGCP-102"])
 
         execute_values_rows = mock_execute_values.call_args[0][2]
         self.assertEqual(len(execute_values_rows), 2)
