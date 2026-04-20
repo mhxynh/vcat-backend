@@ -116,7 +116,7 @@ class TestImportingMain(TestCase):
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_processes_csv_and_upserts(self, mock_get_file, mock_upsert):
         csv_payload = (
-            "VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
             "VGCP-101,Control 101,Owner 1,SME 1,true\n"
             "VGCP-102,Control 102,Owner 2,,false\n"
         ).encode("utf-8")
@@ -175,9 +175,9 @@ class TestImportingMain(TestCase):
         self, mock_get_file, mock_upsert
     ):
         csv_payload = (
-            "vgcpid,description,control_owner,escalation\n"
-            "VGCP-201,,Owner 1,true\n"
-            "VGCP-202,Control 202,Owner 2,false\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "VGCP-201,,Owner 1,,true\n"
+            "VGCP-202,Control 202,Owner 2,,false\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
         mock_upsert.return_value = (1, [])
@@ -198,9 +198,9 @@ class TestImportingMain(TestCase):
         self, mock_get_file, mock_upsert
     ):
         csv_payload = (
-            "vgcpid,description,control_owner,escalation\n"
-            "VGCP-101,Control 101,Owner 1,true\n"
-            "VGCP-101,Control 101 Updated,Owner 2,false\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "VGCP-101,Control 101,Owner 1,,true\n"
+            "VGCP-101,Control 101 Updated,Owner 2,,false\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
         mock_upsert.return_value = (1, [])
@@ -225,9 +225,9 @@ class TestImportingMain(TestCase):
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_skips_existing_database_vgcpids(self, mock_get_file, mock_upsert):
         csv_payload = (
-            "vgcpid,description,control_owner,escalation\n"
-            "VGCP-201,Control 201,Owner 1,true\n"
-            "VGCP-202,Control 202,Owner 2,false\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "VGCP-201,Control 201,Owner 1,,true\n"
+            "VGCP-202,Control 202,Owner 2,,false\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
         mock_upsert.return_value = (0, ["VGCP-201", "VGCP-202"])
@@ -475,11 +475,11 @@ class TestImportingMain(TestCase):
 
     # CSV and row normalization helpers
 
-    def test_normalize_row_keys_maps_aliases(self):
+    def test_normalize_row_keys_maps_template_headers(self):
         normalized = importing.normalize_row_keys(
             {
-                "VGCP ID": "VGCP-01054",
-                "Procedure Name": "Procedure A",
+                "Control ID": "VGCP-01054",
+                "Description": "Procedure A",
                 "Control Owner": "Jason",
                 "Escalation Needed? (Yes / No)": "Yes",
             }
@@ -494,37 +494,42 @@ class TestImportingMain(TestCase):
         normalized = importing.normalize_row_keys(
             {
                 None: "ignore-me",
-                "VGCP ID": "VGCP-01054",
+                "Control ID": "VGCP-01054",
             }
         )
 
         self.assertEqual(normalized["vgcpid"], "VGCP-01054")
         self.assertEqual(len(normalized), 1)
 
-    def test_find_header_row_index_detects_tracker_header(self):
+    def test_find_header_row_index_skips_blank_rows(self):
         rows = [
-            ["", "", "Controls"],
-            ["Ref", "VGCP ID", "Procedure Name", "Control Owner"],
+            ["", "", ""],
+            [
+                "Control ID",
+                "Description",
+                "Control Owner",
+                "Control SME",
+                "Escalation Needed? (Yes / No)",
+            ],
         ]
         self.assertEqual(importing.find_header_row_index(rows), 1)
 
     def test_parse_csv_rows_extracts_rows_after_detected_header(self):
         csv_payload = (
-            ",,Controls\n"
-            "VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
             "VGCP-01054,Procedure A,Jason,,Yes\n"
         ).encode("utf-8")
 
         rows = importing.parse_csv_rows(csv_payload)
         self.assertEqual(len(rows), 1)
         row_number, row = rows[0]
-        self.assertEqual(row_number, 3)
-        self.assertEqual(row["VGCP ID"], "VGCP-01054")
-        self.assertEqual(row["Procedure Name"], "Procedure A")
+        self.assertEqual(row_number, 2)
+        self.assertEqual(row["Control ID"], "VGCP-01054")
+        self.assertEqual(row["Description"], "Procedure A")
 
     def test_parse_csv_rows_rejects_unsupported_headers(self):
         csv_payload = (
-            "VGCP ID,Procedure Name,Control Owner,Control SME,Escalation Needed? (Yes / No),Ref\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No),Ref\n"
             "VGCP-01054,Procedure A,Jason,,Yes,1\n"
         ).encode("utf-8")
 
@@ -556,8 +561,8 @@ class TestImportingMain(TestCase):
 
     def test_parse_csv_rows_ignores_blank_header_cells(self):
         csv_payload = (
-            ",VGCP ID,Procedure Name,Control Owner\n"
-            ",VGCP-01054,Procedure A,Jason\n"
+            ",Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            ",VGCP-01054,Procedure A,Jason,,Yes\n"
         ).encode("utf-8")
 
         rows = importing.parse_csv_rows(csv_payload)
@@ -567,9 +572,9 @@ class TestImportingMain(TestCase):
 
     def test_parse_csv_rows_skips_empty_data_rows(self):
         csv_payload = (
-            "VGCP ID,Procedure Name,Control Owner\n"
-            ",,\n"
-            "VGCP-01054,Procedure A,Jason\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            ",,,,\n"
+            "VGCP-01054,Procedure A,Jason,,Yes\n"
         ).encode("utf-8")
 
         rows = importing.parse_csv_rows(csv_payload)
@@ -733,7 +738,6 @@ class TestImportingMain(TestCase):
                     "vgcpid": "VGCP-101",
                     "description": "Control 101",
                     "control_owner": "",
-                    "tester": "",
                 },
                 2,
             )
@@ -754,8 +758,8 @@ class TestImportingMain(TestCase):
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_process_import_file_raises_when_no_valid_rows(self, mock_get_file):
         csv_payload = (
-            "vgcpid,description,control_owner\n"
-            "VGCP-101,,Owner 1\n"
+            "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
+            "VGCP-101,,Owner 1,,No\n"
         ).encode("utf-8")
         mock_get_file.return_value = (csv_payload, "text/csv")
 

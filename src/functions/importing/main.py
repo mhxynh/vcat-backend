@@ -3,6 +3,7 @@ import io
 import os
 import re
 import uuid
+from collections import Counter
 from datetime import date, datetime
 from urllib.parse import unquote_plus
 
@@ -35,24 +36,19 @@ TRUE_VALUES = {"1", "true", "t", "yes", "y"}
 FALSE_VALUES = {"0", "false", "f", "no", "n"}
 
 FIELD_ALIASES = {
-    "vgcpid": "vgcpid",
-    "vgcp_id": "vgcpid",
-    "vgcp": "vgcpid",
+    "control_id": "vgcpid",
     "description": "description",
-    "procedure_name": "description",
-    "procedure": "description",
     "control_owner": "control_owner",
-    "owner": "control_owner",
-    "controlowner": "control_owner",
     "control_sme": "control_sme",
-    "sme": "control_sme",
-    "escalation": "escalation",
     "escalation_needed_yes_no": "escalation",
-    "is_active": "is_active",
-    "date_created": "date_created",
-    "date_started": "date_created",
-    "last_tested": "last_tested",
-    "date_completed": "last_tested",
+}
+
+FIELD_TO_HEADER = {
+    "vgcpid": "Control ID",
+    "description": "Description",
+    "control_owner": "Control Owner",
+    "control_sme": "Control SME",
+    "escalation": "Escalation Needed? (Yes / No)",
 }
 
 ALLOWED_CSV_COLUMNS = {
@@ -67,7 +63,11 @@ REQUIRED_CSV_COLUMNS = {
     "vgcpid",
     "description",
     "control_owner",
+    "control_sme",
+    "escalation",
 }
+
+SUPPORTED_CSV_HEADERS = list(FIELD_TO_HEADER.values())
 
 
 class ImportValidationError(Exception):
@@ -202,42 +202,69 @@ def normalize_row_keys(raw_row):
 
 def find_header_row_index(csv_rows):
     for row_index, row in enumerate(csv_rows):
-        canonical_columns = set()
-        for cell in row:
-            normalized = normalize_header_key(cell)
-            if not normalized:
-                continue
-            canonical_columns.add(FIELD_ALIASES.get(normalized, normalized))
-
-        if "vgcpid" in canonical_columns and (
-            "description" in canonical_columns or "control_owner" in canonical_columns
-        ):
+        if any(str(cell or "").strip() for cell in row):
             return row_index
     return None
 
 
 def validate_csv_header_row(header_row):
-    canonical_columns = set()
-    for cell in header_row:
-        normalized = normalize_header_key(cell)
-        if not normalized:
-            continue
-        canonical_columns.add(FIELD_ALIASES.get(normalized, normalized))
+    canonical_columns = []
+    unsupported_columns = []
 
-    unexpected_columns = sorted(canonical_columns - ALLOWED_CSV_COLUMNS)
+    for cell in header_row:
+        raw_header = str(cell or "").strip()
+        if not raw_header:
+            continue
+        normalized = normalize_header_key(raw_header)
+        canonical_key = FIELD_ALIASES.get(normalized)
+        if canonical_key is None:
+            unsupported_columns.append(raw_header)
+            continue
+
+        canonical_columns.append(canonical_key)
+
+    if unsupported_columns:
+        raise ImportValidationError(
+            "CSV contains unsupported columns: "
+            + ", ".join(sorted(set(unsupported_columns)))
+            + ". Supported columns are: "
+            + ", ".join(SUPPORTED_CSV_HEADERS)
+            + "."
+        )
+
+    canonical_column_set = set(canonical_columns)
+
+    unexpected_columns = sorted(canonical_column_set - ALLOWED_CSV_COLUMNS)
     if unexpected_columns:
         raise ImportValidationError(
             "CSV contains unsupported columns: "
             + ", ".join(unexpected_columns)
-            + ". Supported columns are: VGCP ID, Procedure Name, Control Owner, "
-            + "Control SME, Escalation Needed? (Yes / No)."
+            + ". Supported columns are: "
+            + ", ".join(SUPPORTED_CSV_HEADERS)
+            + "."
         )
 
-    missing_required_columns = sorted(REQUIRED_CSV_COLUMNS - canonical_columns)
+    missing_required_columns = REQUIRED_CSV_COLUMNS - canonical_column_set
     if missing_required_columns:
+        missing_headers = [
+            header
+            for field, header in FIELD_TO_HEADER.items()
+            if field in missing_required_columns
+        ]
         raise ImportValidationError(
             "CSV header is missing required columns: "
-            + ", ".join(missing_required_columns)
+            + ", ".join(missing_headers)
+        )
+
+    duplicate_columns = [
+        FIELD_TO_HEADER[field]
+        for field, count in Counter(canonical_columns).items()
+        if count > 1
+    ]
+    if duplicate_columns:
+        raise ImportValidationError(
+            "CSV header contains duplicate columns: "
+            + ", ".join(duplicate_columns)
         )
 
 
@@ -246,9 +273,8 @@ def to_control_tuple(raw_row, row_number):
 
     vgcpid = str(row.get("vgcpid", "")).strip()
     description = str(row.get("description", "")).strip()
-    control_owner = str(row.get("control_owner") or row.get("tester") or "").strip()
-    control_sme = row.get("control_sme")
-    control_sme = None if control_sme is None else str(control_sme).strip() or None
+    control_owner = str(row.get("control_owner") or "").strip()
+    control_sme = None if row.get("control_sme") is None else str(row.get("control_sme")).strip() or None
 
     if not vgcpid:
         raise ImportValidationError(f"Row {row_number}: vgcpid is required")
@@ -296,8 +322,9 @@ def parse_csv_rows(file_bytes):
     header_row_index = find_header_row_index(csv_rows)
     if header_row_index is None:
         raise ImportValidationError(
-            "CSV header row was not found. Expected columns like "
-            "'VGCP ID' and 'Procedure Name'."
+            "CSV header row was not found. Expected columns: "
+            + ", ".join(SUPPORTED_CSV_HEADERS)
+            + "."
         )
 
     header_row = csv_rows[header_row_index]
