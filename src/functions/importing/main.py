@@ -139,48 +139,6 @@ def parse_boolean(value, default_value, field_name):
     raise ImportValidationError(f"{field_name} must be a boolean value")
 
 
-def parse_optional_date(value, field_name):
-    if value is None:
-        return None
-
-    if isinstance(value, datetime):
-        return value.date()
-
-    if isinstance(value, date):
-        return value
-
-    text_value = str(value).strip()
-    if text_value == "" or text_value.lower() in {"null", "none"}:
-        return None
-
-    if "T" in text_value:
-        text_value = text_value.split("T", 1)[0]
-
-    date_formats = [
-        "%Y-%m-%d",
-        "%m/%d/%Y",
-        "%m/%d/%y",
-        "%d-%b-%Y",
-        "%d-%b-%y",
-        "%d-%b",
-    ]
-
-    for fmt in date_formats:
-        try:
-            parsed = datetime.strptime(text_value, fmt).date()
-            if fmt == "%d-%b":
-                return parsed.replace(year=datetime.utcnow().year)
-            return parsed
-        except ValueError:
-            continue
-
-    Logger.log(
-        level=LogLevels.WARNING,
-        message="Ignoring unparseable optional date value during import",
-        extra_fields={"field": field_name, "value": text_value},
-    )
-    return None
-
 
 def normalize_header_key(raw_key):
     header = str(raw_key or "").strip().lower()
@@ -289,15 +247,13 @@ def to_control_tuple(raw_row, row_number):
         escalation = parse_boolean(
             row.get("escalation"), default_value=False, field_name="escalation"
         )
-        is_active = parse_boolean(
-            row.get("is_active"), default_value=True, field_name="is_active"
-        )
-        date_created = (
-            parse_optional_date(row.get("date_created"), "date_created") or date.today()
-        )
-        last_tested = parse_optional_date(row.get("last_tested"), "last_tested")
     except ImportValidationError as e:
         raise ImportValidationError(f"Row {row_number}: {str(e)}") from e
+
+    # These fields are system-managed for template imports.
+    is_active = True
+    date_created = date.today()
+    last_tested = None
 
     return (
         vgcpid,
@@ -390,7 +346,7 @@ def get_vgcpid_from_db_row(db_row):
     return db_row[0]
 
 
-def bulk_upsert_controls(control_rows):
+def bulk_insert_controls(control_rows):
     if not control_rows:
         return 0, []
 
@@ -414,12 +370,19 @@ def bulk_upsert_controls(control_rows):
                 RETURNING vgcpid
             """
 
-            execute_values(cursor, query, control_rows, page_size=500)
+            inserted_db_rows = execute_values(
+                cursor,
+                query,
+                control_rows,
+                page_size=500,
+                fetch=True,
+            )
 
             inserted_vgcpids = {
                 vgcpid
                 for vgcpid in (
-                    get_vgcpid_from_db_row(db_row) for db_row in cursor.fetchall()
+                    get_vgcpid_from_db_row(db_row)
+                    for db_row in (inserted_db_rows or [])
                 )
                 if vgcpid
             }
@@ -466,7 +429,7 @@ def process_import_file(bucket_name, object_key):
     if not deduped_valid_rows:
         raise ImportValidationError("No valid rows were found in the uploaded file")
 
-    inserted_rows, existing_vgcpids = bulk_upsert_controls(deduped_valid_rows)
+    inserted_rows, existing_vgcpids = bulk_insert_controls(deduped_valid_rows)
 
     if existing_vgcpids:
         Logger.log(

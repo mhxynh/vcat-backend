@@ -112,7 +112,7 @@ class TestImportingMain(TestCase):
 
     # S3 event processing
 
-    @patch("functions.importing.main.bulk_upsert_controls")
+    @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_processes_csv_and_upserts(self, mock_get_file, mock_upsert):
         csv_payload = (
@@ -145,7 +145,7 @@ class TestImportingMain(TestCase):
         self.assertIsInstance(inserted_rows[0][6], date)
         self.assertIsNone(inserted_rows[0][7])
 
-    @patch("functions.importing.main.bulk_upsert_controls")
+    @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_rejects_tracker_style_csv_with_unsupported_columns(
         self, mock_get_file, mock_upsert
@@ -169,7 +169,7 @@ class TestImportingMain(TestCase):
         self.assertIn("unsupported columns", body["skipped_files"][0]["error"].lower())
         mock_upsert.assert_not_called()
 
-    @patch("functions.importing.main.bulk_upsert_controls")
+    @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_tracks_invalid_rows_and_keeps_valid_rows(
         self, mock_get_file, mock_upsert
@@ -192,7 +192,7 @@ class TestImportingMain(TestCase):
         self.assertEqual(processed_file["invalid_rows"], 1)
         self.assertEqual(len(processed_file["invalid_row_samples"]), 1)
 
-    @patch("functions.importing.main.bulk_upsert_controls")
+    @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_deduplicates_duplicate_vgcpid_rows(
         self, mock_get_file, mock_upsert
@@ -221,7 +221,7 @@ class TestImportingMain(TestCase):
         self.assertEqual(inserted_rows[0][1], "Control 101 Updated")
         self.assertEqual(inserted_rows[0][2], "Owner 2")
 
-    @patch("functions.importing.main.bulk_upsert_controls")
+    @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_skips_existing_database_vgcpids(self, mock_get_file, mock_upsert):
         csv_payload = (
@@ -244,7 +244,7 @@ class TestImportingMain(TestCase):
         self.assertEqual(processed_file["inserted_rows"], 0)
         self.assertNotIn("upserted_rows", processed_file)
 
-    @patch("functions.importing.main.bulk_upsert_controls")
+    @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
     def test_s3_event_skips_json_payload_as_invalid(self, mock_get_file, mock_upsert):
         json_payload = json.dumps(
@@ -430,48 +430,6 @@ class TestImportingMain(TestCase):
         with self.assertRaises(ImportValidationError):
             importing.parse_boolean("maybe", False, "escalation")
 
-    # Date parsing
-
-    def test_parse_optional_date_supports_multiple_formats(self):
-        self.assertEqual(
-            importing.parse_optional_date("2026-04-10", "last_tested"),
-            date(2026, 4, 10),
-        )
-        self.assertEqual(
-            importing.parse_optional_date("4/10/2026", "last_tested"),
-            date(2026, 4, 10),
-        )
-        self.assertEqual(
-            importing.parse_optional_date("10-Apr-2026", "last_tested"),
-            date(2026, 4, 10),
-        )
-
-    def test_parse_optional_date_accepts_date_instance(self):
-        value = date(2026, 4, 10)
-        self.assertEqual(importing.parse_optional_date(value, "last_tested"), value)
-
-    def test_parse_optional_date_converts_datetime_instance_to_date(self):
-        value = datetime(2026, 4, 10, 14, 30, 0)
-        parsed = importing.parse_optional_date(value, "last_tested")
-
-        self.assertEqual(parsed, date(2026, 4, 10))
-        self.assertFalse(isinstance(parsed, datetime))
-
-    def test_parse_optional_date_handles_iso_datetime_value(self):
-        self.assertEqual(
-            importing.parse_optional_date("2026-04-10T14:30:00Z", "last_tested"),
-            date(2026, 4, 10),
-        )
-
-    def test_parse_optional_date_day_month_uses_current_year(self):
-        parsed = importing.parse_optional_date("10-Apr", "last_tested")
-        self.assertEqual(parsed.month, 4)
-        self.assertEqual(parsed.day, 10)
-
-    @patch("functions.importing.main.Logger.log")
-    def test_parse_optional_date_returns_none_for_unparseable_values(self, mock_log):
-        self.assertIsNone(importing.parse_optional_date("not-a-date", "last_tested"))
-        mock_log.assert_called_once()
 
     # CSV and row normalization helpers
 
@@ -633,17 +591,16 @@ class TestImportingMain(TestCase):
 
     @patch("functions.importing.main.execute_values")
     @patch("functions.importing.main.DbUtils.get_db_connection")
-    def test_bulk_upsert_controls_inserts_only_new_ids(
+    def test_bulk_insert_controls_inserts_only_new_ids(
         self, mock_get_db_connection, mock_execute_values
     ):
         connection = MagicMock()
         cursor = MagicMock()
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
+        mock_execute_values.return_value = [{"vgcpid": "VGCP-101"}]
 
-        cursor.fetchall.return_value = [{"vgcpid": "VGCP-101"}]
-
-        inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
+        inserted_rows, existing_vgcpids = importing.bulk_insert_controls(
             [
                 self._build_control_row("VGCP-101"),
                 self._build_control_row("VGCP-102"),
@@ -657,21 +614,23 @@ class TestImportingMain(TestCase):
         self.assertEqual(len(execute_values_rows), 2)
         self.assertEqual(execute_values_rows[0][0], "VGCP-101")
         self.assertEqual(execute_values_rows[1][0], "VGCP-102")
+        self.assertEqual(mock_execute_values.call_args.kwargs["page_size"], 500)
+        self.assertTrue(mock_execute_values.call_args.kwargs["fetch"])
 
     # DB insert helper behavior
 
     @patch("functions.importing.main.execute_values")
     @patch("functions.importing.main.DbUtils.get_db_connection")
-    def test_bulk_upsert_controls_skips_when_all_ids_exist(
+    def test_bulk_insert_controls_skips_when_all_ids_exist(
         self, mock_get_db_connection, mock_execute_values
     ):
         connection = MagicMock()
         cursor = MagicMock()
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
-        cursor.fetchall.return_value = []
+        mock_execute_values.return_value = []
 
-        inserted_rows, existing_vgcpids = importing.bulk_upsert_controls(
+        inserted_rows, existing_vgcpids = importing.bulk_insert_controls(
             [self._build_control_row("VGCP-101")]
         )
 
@@ -682,28 +641,49 @@ class TestImportingMain(TestCase):
     def test_get_vgcpid_from_db_row_supports_tuple_rows(self):
         self.assertEqual(importing.get_vgcpid_from_db_row(("VGCP-101",)), "VGCP-101")
 
-    def test_bulk_upsert_controls_returns_zero_for_empty_input(self):
-        self.assertEqual(importing.bulk_upsert_controls([]), (0, []))
+    def test_bulk_insert_controls_returns_zero_for_empty_input(self):
+        self.assertEqual(importing.bulk_insert_controls([]), (0, []))
 
     @patch("functions.importing.main.execute_values")
     @patch("functions.importing.main.DbUtils.get_db_connection")
-    def test_bulk_upsert_controls_rolls_back_on_exception(
+    def test_bulk_insert_controls_rolls_back_on_exception(
         self, mock_get_db_connection, mock_execute_values
     ):
         connection = MagicMock()
         cursor = MagicMock()
         mock_get_db_connection.return_value = connection
         connection.cursor.return_value.__enter__.return_value = cursor
-
-        cursor.fetchall.return_value = []
         mock_execute_values.side_effect = Exception("insert failed")
 
         with self.assertRaises(Exception):
-            importing.bulk_upsert_controls([self._build_control_row("VGCP-101")])
+            importing.bulk_insert_controls([self._build_control_row("VGCP-101")])
 
         connection.rollback.assert_called_once()
 
     # To Control Tuple conversion
+
+    def test_to_control_tuple_applies_system_managed_defaults(self):
+        row = {
+            "vgcpid": "VGCP-101",
+            "description": "Control 101",
+            "control_owner": "Owner 1",
+            "control_sme": "SME 1",
+            "escalation": "true",
+            "is_active": "false",
+            "date_created": "2020-01-01",
+            "last_tested": "2026-04-10",
+        }
+
+        result = importing.to_control_tuple(row, 2)
+
+        self.assertEqual(result[0], "VGCP-101")
+        self.assertEqual(result[1], "Control 101")
+        self.assertEqual(result[2], "Owner 1")
+        self.assertEqual(result[3], "SME 1")
+        self.assertTrue(result[4])
+        self.assertTrue(result[5])
+        self.assertEqual(result[6], date.today())
+        self.assertIsNone(result[7])
 
     def test_to_control_tuple_exception(self):
         with self.assertRaises(ImportValidationError) as ctx:
