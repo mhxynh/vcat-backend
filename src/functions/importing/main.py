@@ -252,8 +252,7 @@ def validate_csv_header_row(header_row):
             if field in missing_required_columns
         ]
         raise ImportValidationError(
-            "CSV header is missing required columns: "
-            + ", ".join(missing_headers)
+            "CSV header is missing required columns: " + ", ".join(missing_headers)
         )
 
     duplicate_columns = [
@@ -263,8 +262,7 @@ def validate_csv_header_row(header_row):
     ]
     if duplicate_columns:
         raise ImportValidationError(
-            "CSV header contains duplicate columns: "
-            + ", ".join(duplicate_columns)
+            "CSV header contains duplicate columns: " + ", ".join(duplicate_columns)
         )
 
 
@@ -274,7 +272,11 @@ def to_control_tuple(raw_row, row_number):
     vgcpid = str(row.get("vgcpid", "")).strip()
     description = str(row.get("description", "")).strip()
     control_owner = str(row.get("control_owner") or "").strip()
-    control_sme = None if row.get("control_sme") is None else str(row.get("control_sme")).strip() or None
+    control_sme = (
+        None
+        if row.get("control_sme") is None
+        else str(row.get("control_sme")).strip() or None
+    )
 
     if not vgcpid:
         raise ImportValidationError(f"Row {row_number}: vgcpid is required")
