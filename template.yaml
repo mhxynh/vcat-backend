@@ -33,6 +33,9 @@ Parameters:
   UserPoolArnPath:
     Type: "AWS::SSM::Parameter::Value<String>"
     Default: "/vcat/prod/cognito/user-pool-arn"
+  ImportUploadBucketArn:
+    Type: String
+    Default: arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-mkpwwj7siylh
 
 Resources:
   VcatApi:
@@ -288,6 +291,45 @@ Resources:
             RestApiId: !Ref VcatApi
             Auth:
               Authorizer: MyCognitoAuthorizer
+
+  ImportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/importing/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
+      Timeout: 60
+      Environment:
+        Variables:
+          UPLOAD_BUCKET_NAME: !Select
+            - 5
+            - !Split [":", !Ref ImportUploadBucketArn]
+          UPLOAD_KEY_PREFIX: control-metadata/
+          PRESIGNED_URL_TTL_SECONDS: "900"
+          IMPORT_MAX_FILE_SIZE_MB: "20"
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Select
+              - 5
+              - !Split [":", !Ref ImportUploadBucketArn]
+      Events:
+        GetImportUploadUrl:
+          Type: Api
+          Properties:
+            Path: /import
+            Method: post
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
+
+  ImportUploadInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ImportFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Ref ImportUploadBucketArn
 
   NotificationsFunction:
     Type: AWS::Serverless::Function

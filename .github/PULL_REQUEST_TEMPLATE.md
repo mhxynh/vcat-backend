@@ -36,8 +36,8 @@ Attach a screenshot of your terminal logs OR a snippet from your database client
 
 ## Quality Standards
 
-- [ ] **Black**: I ran `black .` to format the code.
-- [ ] **Flake8**: I ran `flake8` and fixed any naming convention errors (snake_case).
+- [ ] **Black**: I ran `python -m black src` to format the code.
+- [ ] **Flake8**: I ran `python -m flake8 src` and fixed any naming convention errors (snake_case).
 - [ ] **DB Connection**: I verified the connection to the RDS/Sandbox DB.
 
 ## Reviewer’s "Quick Reject" Criteria
