@@ -114,7 +114,7 @@ class TestImportingMain(TestCase):
 
     @patch("functions.importing.main.bulk_insert_controls")
     @patch("functions.importing.main.S3Utils.get_file_from_s3")
-    def test_s3_event_processes_csv_and_upserts(self, mock_get_file, mock_upsert):
+    def test_s3_event_processes_csv_and_inserts_new_rows_and_skips_existing(self, mock_get_file, mock_upsert):
         csv_payload = (
             "Control ID,Description,Control Owner,Control SME,Escalation Needed? (Yes / No)\n"
             "VGCP-101,Control 101,Owner 1,SME 1,true\n"
