@@ -139,7 +139,6 @@ def parse_boolean(value, default_value, field_name):
     raise ImportValidationError(f"{field_name} must be a boolean value")
 
 
-
 def normalize_header_key(raw_key):
     header = str(raw_key or "").strip().lower()
     header = re.sub(r"[^a-z0-9]+", "_", header)
