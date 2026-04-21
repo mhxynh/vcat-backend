@@ -549,7 +549,7 @@ class TestRepository:
             raise e
 
     @staticmethod
-    def soft_delete(test_id):
+    def update_status(test_id, status):
         try:
             conn = DbUtils.get_db_connection()
             try:
@@ -560,14 +560,51 @@ class TestRepository:
 
                     query = """
                         UPDATE tests
-                        SET status = 'ARCHIVED'
+                        SET status = %s
                         WHERE test_id = %s
                         RETURNING *;
                     """
-                    cur.execute(query, (test_id,))
+                    cur.execute(query, (status, test_id))
+                    row = cur.fetchone()
+                    updated = dict(row) if row else None
+                    TestAuditUtils.audit_update(cur, before_row, updated)
+                    conn.commit()
+                    return updated
+            finally:
+                conn.close()
+        except Exception as e:
+            Logger.log(
+                level="ERROR",
+                message="Error updating test status",
+                extra_fields={"error": str(e), "test_id": test_id, "status": status},
+            )
+            raise e
+
+    @staticmethod
+    def soft_delete(test_id, archive=True):
+        try:
+            conn = DbUtils.get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    before_row = None
+                    if TestAuditUtils.get_context():
+                        before_row = TestAuditUtils.fetch_before(cur, test_id)
+
+                    target_status = "ARCHIVED" if archive else "NOT_STARTED"
+
+                    query = """
+                        UPDATE tests
+                        SET status = %s
+                        WHERE test_id = %s
+                        RETURNING *;
+                    """
+                    cur.execute(query, (target_status, test_id))
                     row = cur.fetchone()
                     archived = dict(row) if row else None
-                    TestAuditUtils.audit_soft_delete(cur, before_row, archived)
+                    if archive:
+                        TestAuditUtils.audit_soft_delete(cur, before_row, archived)
+                    else:
+                        TestAuditUtils.audit_update(cur, before_row, archived)
                     conn.commit()
                     return archived
             finally:

@@ -163,9 +163,27 @@ class TestRequestsMain(TestCase):
 		event = self._build_event("DELETE", "/requests/42", path_params={"id": "42"})
 		result = requests.lambda_handler(event, None)
 
-		mock_logger.log.assert_any_call(level="INFO", message="Archived request", extra_fields={"request_id": '42'})
+		mock_logger.log.assert_any_call(level="INFO", message="Archived request", extra_fields={"request_id": '42', "status": "ARCHIVED"})
 		self.assertEqual(result["statusCode"], 200)
 		self.assertEqual(json.loads(result["body"])["status"], "ARCHIVED")
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_delete_request_soft_unarchive_returns_200(self, mock_crud, mock_logger):
+		mock_crud.update.return_value = {"request_id": 42, "status": "NOT_STARTED"}
+
+		event = self._build_event(
+			"DELETE",
+			"/requests/42",
+			path_params={"id": "42"},
+			query_params={"archive": "false"},
+		)
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.update.assert_called_once_with("requests", "request_id", '42', {"status": "NOT_STARTED"})
+		mock_logger.log.assert_any_call(level="INFO", message="Unarchived request", extra_fields={"request_id": '42', "status": "NOT_STARTED"})
+		self.assertEqual(result["statusCode"], 200)
+		self.assertEqual(json.loads(result["body"])["status"], "NOT_STARTED")
 
 	@patch('functions.requests.main.Logger')
 	@patch('functions.requests.main.CrudUtils')
@@ -189,6 +207,23 @@ class TestRequestsMain(TestCase):
 		result = requests.lambda_handler(event, None)
 
 		mock_logger.log.assert_any_call(level="WARNING", message="Request not found for archive", extra_fields={"request_id": '999'})
+		self.assertEqual(result["statusCode"], 404)
+		self.assertIn("Request not found", json.loads(result["body"])['error'])
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_delete_request_unarchive_not_found_returns_404(self, mock_crud, mock_logger):
+		mock_crud.update.return_value = None
+
+		event = self._build_event(
+			"DELETE",
+			"/requests/999",
+			path_params={"id": "999"},
+			query_params={"archive": "false"},
+		)
+		result = requests.lambda_handler(event, None)
+
+		mock_logger.log.assert_any_call(level="WARNING", message="Request not found for unarchive", extra_fields={"request_id": '999'})
 		self.assertEqual(result["statusCode"], 404)
 		self.assertIn("Request not found", json.loads(result["body"])['error'])
 

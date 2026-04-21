@@ -293,7 +293,22 @@ class TestTestsMain(TestCase):
         
         result = tests_main.lambda_handler(event, None)
         
-        mock_repo.soft_delete.assert_called_once_with("42")
+        mock_repo.soft_delete.assert_called_once_with("42", archive=True)
+        self.assertEqual(result["statusCode"], 200)
+
+    @patch('functions.tests.main.TestRepository')
+    def test_delete_test_soft_unarchive_returns_200(self, mock_repo):
+        mock_repo.soft_delete.return_value = {"test_id": "42", "status": "NOT_STARTED"}
+        event = self._build_event(
+            "DELETE",
+            "/tests/42",
+            path_params={"test_id": "42"},
+            query_params={"archive": "false"},
+        )
+
+        result = tests_main.lambda_handler(event, None)
+
+        mock_repo.soft_delete.assert_called_once_with("42", archive=False)
         self.assertEqual(result["statusCode"], 200)
 
     @patch('functions.tests.main.TestRepository')

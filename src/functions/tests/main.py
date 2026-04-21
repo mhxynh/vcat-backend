@@ -177,6 +177,13 @@ def lambda_handler(event, context):
                     body.get("description"),
                     body.get("evidence_links"),
                 )
+            elif action == "update_status":
+                if "status" not in body:
+                    return ResponseUtils.http_response(
+                        StatusCodes.BAD_REQUEST,
+                        {"error": "status is required for update_status action"},
+                    )
+                updated_record = TestRepository.update_status(test_id, body.get("status"))
             else:
                 return ResponseUtils.http_response(
                     StatusCodes.BAD_REQUEST, {"error": "Invalid or missing action"}
@@ -208,11 +215,12 @@ def lambda_handler(event, context):
 
             params = event.get("queryStringParameters") or {}
             hard_delete = str(params.get("hard", "false")).lower() == "true"
+            archive = str(params.get("archive", "true")).lower() != "false"
 
             if hard_delete:
                 deleted = TestRepository.hard_delete(test_id)
             else:
-                deleted = TestRepository.soft_delete(test_id)
+                deleted = TestRepository.soft_delete(test_id, archive=archive)
 
             if not deleted:
                 return ResponseUtils.http_response(

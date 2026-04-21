@@ -380,10 +380,27 @@ class TestTestRepository(TestCase):
         result = TestRepository.soft_delete(42)
 
         args, _ = mock_cursor.execute.call_args
-        self.assertIn("SET status = 'ARCHIVED'", args[0])
+        self.assertIn("SET status = %s", args[0])
+        self.assertEqual(args[1], ("ARCHIVED", 42))
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["status"], "ARCHIVED")
         self.assertEqual(result["assigned_tester_name"], "Alice")
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_soft_delete_unarchive_success(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection(
+            {"test_id": 42, "status": "NOT_STARTED", "assigned_tester_name": "Alice"},
+            fetchone=True,
+        )
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.soft_delete(42, archive=False)
+
+        args, _ = mock_cursor.execute.call_args
+        self.assertIn("SET status = %s", args[0])
+        self.assertEqual(args[1], ("NOT_STARTED", 42))
+        mock_conn.commit.assert_called_once()
+        self.assertEqual(result["status"], "NOT_STARTED")
 
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
@@ -560,6 +577,23 @@ class TestTestRepository(TestCase):
 
         mock_audit.fetch_before.assert_called_once()
         mock_audit.audit_soft_delete.assert_called_once()
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_soft_unarchive_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection(
+            {"test_id": 42, "status": "NOT_STARTED"},
+            fetchone=True,
+        )
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "status": "ARCHIVED"}
+
+        TestRepository.soft_delete(42, archive=False)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        mock_audit.audit_soft_delete.assert_not_called()
 
     @patch('functions.tests.test_repository.TestAuditUtils')
     @patch('functions.tests.test_repository.DbUtils')
