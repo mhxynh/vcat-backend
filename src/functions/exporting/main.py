@@ -28,21 +28,43 @@ def fetch_rows(table):
         if table == TableNames.TESTS:
             rows = CrudUtils.get_all(TableNames.TESTS)
             enriched = []
+
+            # Prefetch controls and users to avoid N+1 queries; fall back to get_by_id
+            controls = CrudUtils.get_all(TableNames.CONTROLS) or []
+            users = CrudUtils.get_all(TableNames.USERS) or []
+
+            # Only map controls/users if they include the expected exported fields
+            control_map = {c.get("control_id"): c.get("vgcpid") for c in controls if c and c.get("vgcpid")}
+            user_map = {u.get("user_id"): u for u in users if u and (u.get("display_name") or u.get("email"))}
+
             for r in rows:
                 row = dict(r)
 
                 ctrl_id = row.get("control_id")
                 if ctrl_id:
-                    ctrl = CrudUtils.get_by_id(
-                        TableNames.CONTROLS, "control_id", ctrl_id
-                    )
-                    if ctrl:
-                        row["control_vgcpid"] = ctrl.get("vgcpid")
-                        row["control_description"] = ctrl.get("description")
+                    vgcp = control_map.get(ctrl_id)
+                    if not vgcp:
+                        try:
+                            ctrl = CrudUtils.get_by_id(TableNames.CONTROLS, "control_id", ctrl_id)
+                            vgcp = ctrl.get("vgcpid") if ctrl else None
+                            ctrl_desc = ctrl.get("description") if ctrl else None
+                        except Exception:
+                            vgcp = None
+                            ctrl_desc = None
+                    else:
+                        ctrl_desc = None
+                    if vgcp:
+                        row["control_vgcpid"] = vgcp
+                        row["control_description"] = ctrl_desc
 
                 tester_id = row.get("assigned_tester_id")
                 if tester_id:
-                    tester = CrudUtils.get_by_id(TableNames.USERS, "user_id", tester_id)
+                    tester = user_map.get(tester_id)
+                    if not tester:
+                        try:
+                            tester = CrudUtils.get_by_id(TableNames.USERS, "user_id", tester_id)
+                        except Exception:
+                            tester = None
                     if tester:
                         row["assigned_tester_name"] = tester.get("display_name")
                         row["assigned_tester_email"] = tester.get("email")
@@ -62,24 +84,28 @@ def fetch_rows(table):
             control_map = {c.get("control_id"): c.get("vgcpid") for c in controls if c}
             request_to_vgcpids = {}
             for t in tests:
-                try:
-                    req_id = t.get("request_id")
-                    ctrl_id = t.get("control_id")
-                    if req_id and ctrl_id:
-                        vgcp = control_map.get(ctrl_id)
-                        if not vgcp:
-                            try:
-                                ctrl = CrudUtils.get_by_id(
-                                    TableNames.CONTROLS, "control_id", ctrl_id
-                                )
-                                if ctrl:
-                                    vgcp = ctrl.get("vgcpid")
-                            except Exception:
-                                vgcp = None
-                        if vgcp:
-                            request_to_vgcpids.setdefault(req_id, []).append(vgcp)
-                except Exception:
+                req_id = t.get("request_id")
+                ctrl_id = t.get("control_id")
+                if not (req_id and ctrl_id):
                     continue
+
+                vgcp = control_map.get(ctrl_id)
+                if not vgcp:
+                    try:
+                        ctrl = CrudUtils.get_by_id(
+                            TableNames.CONTROLS, "control_id", ctrl_id
+                        )
+                        vgcp = ctrl.get("vgcpid") if ctrl else None
+                    except Exception as e:
+                        Logger.log(
+                            level=LogLevels.WARNING,
+                            message="Failed to fetch control for tests mapping",
+                            extra_fields={"control_id": ctrl_id, "request_id": req_id, "error": str(e)},
+                        )
+                        vgcp = None
+
+                if vgcp:
+                    request_to_vgcpids.setdefault(req_id, []).append(vgcp)
 
             for r in rows:
                 row = dict(r)
