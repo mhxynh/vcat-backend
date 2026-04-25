@@ -64,7 +64,7 @@ class TestExportingMain(TestCase):
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(result["headers"]["Content-Type"], "text/csv")
         body = result["body"]
-        self.assertIn("vgcpid", body)
+        self.assertIn("VGCPID", body)
         self.assertIn("VGCP-001", body)
 
     @patch('functions.exporting.main.Logger')
@@ -81,10 +81,38 @@ class TestExportingMain(TestCase):
 
         self.assertEqual(result["statusCode"], 200)
         body = result["body"]
-        self.assertIn("request_requestor", body)
-        self.assertIn("Alice", body)
-        self.assertIn("control_vgcpid", body)
+        self.assertNotIn("request_requestor", body)
+        self.assertIn("VGCPID", body)
         self.assertIn("VGCP-020", body)
+        self.assertIn("Tester", body)
+        self.assertIn("t@example.com", body)
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    def test_tests_headers_capitalize_dat_oet(self, mock_crud, mock_logger):
+        # Ensure DAT/OET tokens are capitalized in headers and included in correct order
+        test_row = {
+            "test_id": 3,
+            "request_id": 10,
+            "control_id": 20,
+            "assigned_tester_id": 30,
+            "requires_dat": True,
+            "requires_oet": False,
+            "dat_step": "Step A",
+            "oet_step": "Step B",
+        }
+        mock_crud.get_all.return_value = [test_row]
+        mock_crud.get_by_id.side_effect = self.get_by_id_side_effect
+
+        event = self._build_event("GET", "/export", query_params={"table": "tests"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        body = result["body"]
+        self.assertIn("Requires DAT", body)
+        self.assertIn("Requires OET", body)
+        self.assertIn("DAT Step", body)
+        self.assertIn("OET Step", body)
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')

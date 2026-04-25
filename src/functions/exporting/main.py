@@ -17,6 +17,8 @@ ALLOWED_TABLES = {TableNames.CONTROLS, TableNames.TESTS, TableNames.REQUESTS}
 def serialize_value(v):
     if isinstance(v, (date, datetime)):
         return v.isoformat()
+    if isinstance(v, bool):
+        return "Yes" if v else "No"
     if isinstance(v, (list, tuple)):
         return ";".join([str(x) for x in v])
     if v is None:
@@ -77,6 +79,74 @@ def fetch_rows(table):
         raise
 
 
+def format_controls_csv(rows):
+    headers = [
+        "VGCPID",
+        "Description",
+        "Control Owner",
+        "Control SME",
+        "Escalation Required?",
+        "Is Active?",
+        "Date Created",
+        "Last Tested",
+    ]
+    data = []
+    for row in rows:
+        data.append([
+            serialize_value(row.get("vgcpid")),
+            serialize_value(row.get("description")),
+            serialize_value(row.get("control_owner")),
+            serialize_value(row.get("control_sme")),
+            serialize_value(row.get("escalation")),
+            serialize_value(row.get("is_active")),
+            serialize_value(row.get("date_created")),
+            serialize_value(row.get("last_tested")),
+        ])
+    return headers, data
+
+
+def format_tests_csv(rows):
+    headers = [
+        "VGCPID",
+        "Assigned Tester Name",
+        "Assigned Tester Email",
+    ]
+    data = []
+    if not rows:
+        return headers, data
+
+    excluded = {
+        "test_id",
+        "request_id",
+        "control_id",
+        "assigned_tester_id",
+        "request_requestor",
+        "request_description",
+        "control_description",
+    }
+
+    # add remaining headers in original order, map DAT/OET to uppercase labels
+    for key in rows[0].keys():
+        if key in excluded or key in ("control_vgcpid", "assigned_tester_name", "assigned_tester_email"):
+            continue
+        parts = key.split("_")
+        label = " ".join([p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts])
+        headers.append(label)
+
+    for row in rows:
+        row_vals = []
+        row_vals.append(serialize_value(row.get("control_vgcpid")))
+        row_vals.append(serialize_value(row.get("assigned_tester_name")))
+        row_vals.append(serialize_value(row.get("assigned_tester_email")))
+        for key in rows[0].keys():
+            if key in excluded or key in ("control_vgcpid", "assigned_tester_name", "assigned_tester_email"):
+                continue
+            row_vals.append(serialize_value(row.get(key)))
+        data.append(row_vals)
+
+    return headers, data
+
+
 def lambda_handler(event, context):
     method = event.get("httpMethod")
 
@@ -124,11 +194,22 @@ def lambda_handler(event, context):
             output = io.StringIO()
             writer = csv.writer(output)
 
-            if rows:
-                headers = list(rows[0].keys())
+            if table == TableNames.CONTROLS:
+                headers, data_rows = format_controls_csv(rows)
                 writer.writerow(headers)
-                for row in rows:
-                    writer.writerow([serialize_value(row.get(h)) for h in headers])
+                for data in data_rows:
+                    writer.writerow(data)
+            elif table == TableNames.TESTS:
+                headers, data_rows = format_tests_csv(rows)
+                writer.writerow(headers)
+                for data in data_rows:
+                    writer.writerow(data)
+            else:
+                if rows:
+                    headers = list(rows[0].keys())
+                    writer.writerow(headers)
+                    for row in rows:
+                        writer.writerow([serialize_value(row.get(h)) for h in headers])
 
             csv_text = output.getvalue()
             filename = f"{table}_export.csv"
