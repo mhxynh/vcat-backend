@@ -34,8 +34,16 @@ def fetch_rows(table):
             users = CrudUtils.get_all(TableNames.USERS) or []
 
             # Only map controls/users if they include the expected exported fields
-            control_map = {c.get("control_id"): c.get("vgcpid") for c in controls if c and c.get("vgcpid")}
-            user_map = {u.get("user_id"): u for u in users if u and (u.get("display_name") or u.get("email"))}
+            control_map = {
+                c.get("control_id"): c.get("vgcpid")
+                for c in controls
+                if c and c.get("vgcpid")
+            }
+            user_map = {
+                u.get("user_id"): u
+                for u in users
+                if u and (u.get("display_name") or u.get("email"))
+            }
 
             for r in rows:
                 row = dict(r)
@@ -45,7 +53,9 @@ def fetch_rows(table):
                     vgcp = control_map.get(ctrl_id)
                     if not vgcp:
                         try:
-                            ctrl = CrudUtils.get_by_id(TableNames.CONTROLS, "control_id", ctrl_id)
+                            ctrl = CrudUtils.get_by_id(
+                                TableNames.CONTROLS, "control_id", ctrl_id
+                            )
                             vgcp = ctrl.get("vgcpid") if ctrl else None
                             ctrl_desc = ctrl.get("description") if ctrl else None
                         except Exception:
@@ -62,7 +72,9 @@ def fetch_rows(table):
                     tester = user_map.get(tester_id)
                     if not tester:
                         try:
-                            tester = CrudUtils.get_by_id(TableNames.USERS, "user_id", tester_id)
+                            tester = CrudUtils.get_by_id(
+                                TableNames.USERS, "user_id", tester_id
+                            )
                         except Exception:
                             tester = None
                     if tester:
@@ -100,7 +112,11 @@ def fetch_rows(table):
                         Logger.log(
                             level=LogLevels.WARNING,
                             message="Failed to fetch control for tests mapping",
-                            extra_fields={"control_id": ctrl_id, "request_id": req_id, "error": str(e)},
+                            extra_fields={
+                                "control_id": ctrl_id,
+                                "request_id": req_id,
+                                "error": str(e),
+                            },
                         )
                         vgcp = None
 
