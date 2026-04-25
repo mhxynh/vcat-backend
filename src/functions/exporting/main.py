@@ -30,12 +30,6 @@ def fetch_rows(table):
             enriched = []
             for r in rows:
                 row = dict(r)
-                req_id = row.get("request_id")
-                if req_id:
-                    req = CrudUtils.get_by_id(TableNames.REQUESTS, "request_id", req_id)
-                    if req:
-                        row["request_requestor"] = req.get("requestor")
-                        row["request_description"] = req.get("description")
 
                 ctrl_id = row.get("control_id")
                 if ctrl_id:
@@ -59,6 +53,34 @@ def fetch_rows(table):
         if table == TableNames.REQUESTS:
             rows = CrudUtils.get_all(TableNames.REQUESTS)
             enriched = []
+
+            # fetch tests and controls once to build a mapping request_id -> [vgcpid]
+            tests = CrudUtils.get_all(TableNames.TESTS) or []
+
+            controls = CrudUtils.get_all(TableNames.CONTROLS) or []
+
+            control_map = {c.get("control_id"): c.get("vgcpid") for c in controls if c}
+            request_to_vgcpids = {}
+            for t in tests:
+                try:
+                    req_id = t.get("request_id")
+                    ctrl_id = t.get("control_id")
+                    if req_id and ctrl_id:
+                        vgcp = control_map.get(ctrl_id)
+                        if not vgcp:
+                            try:
+                                ctrl = CrudUtils.get_by_id(
+                                    TableNames.CONTROLS, "control_id", ctrl_id
+                                )
+                                if ctrl:
+                                    vgcp = ctrl.get("vgcpid")
+                            except Exception:
+                                vgcp = None
+                        if vgcp:
+                            request_to_vgcpids.setdefault(req_id, []).append(vgcp)
+                except Exception:
+                    continue
+
             for r in rows:
                 row = dict(r)
                 created_by = row.get("created_by")
@@ -67,25 +89,10 @@ def fetch_rows(table):
                     if user:
                         row["created_by_name"] = user.get("display_name")
                         row["created_by_email"] = user.get("email")
-                # gather VGCPIDs of tests that reference this request
-                try:
-                    tests = CrudUtils.get_all(TableNames.TESTS) or []
-                except Exception:
-                    tests = []
-                vgcpids = []
-                for t in tests:
-                    try:
-                        if t.get("request_id") == row.get("request_id"):
-                            ctrl_id = t.get("control_id")
-                            if ctrl_id:
-                                ctrl = CrudUtils.get_by_id(
-                                    TableNames.CONTROLS, "control_id", ctrl_id
-                                )
-                                if ctrl:
-                                    vgcpids.append(ctrl.get("vgcpid"))
-                    except Exception:
-                        continue
-                row["tests_requested"] = vgcpids
+
+                row["tests_requested"] = request_to_vgcpids.get(
+                    row.get("request_id"), []
+                )
                 enriched.append(row)
             return enriched
 

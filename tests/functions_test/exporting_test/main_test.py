@@ -164,7 +164,6 @@ class TestExportingMain(TestCase):
         rows = exporting.fetch_rows(exporting.TableNames.TESTS)
         self.assertEqual(len(rows), 1)
         row = rows[0]
-        self.assertEqual(row.get("request_requestor"), "Alice")
         self.assertEqual(row.get("control_vgcpid"), "VGCP-020")
         self.assertEqual(row.get("assigned_tester_name"), "Tester")
 
