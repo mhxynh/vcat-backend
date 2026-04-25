@@ -89,6 +89,33 @@ class TestExportingMain(TestCase):
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
+    def test_requests_tests_requested_column(self, mock_crud, mock_logger):
+        # Ensure requests export includes a 'Tests Requested' column listing linked VGCPIDs
+        request_row = {"request_id": 10, "created_by": 30, "description": "Req desc"}
+        test_row = {"test_id": 1, "request_id": 10, "control_id": 20, "assigned_tester_id": 30}
+
+        def get_all_side_effect(table):
+            if table == exporting.TableNames.REQUESTS:
+                return [request_row]
+            if table == exporting.TableNames.TESTS:
+                return [test_row]
+            return []
+
+        mock_crud.get_all.side_effect = get_all_side_effect
+        mock_crud.get_by_id.side_effect = self.get_by_id_side_effect
+
+        event = self._build_event("GET", "/export", query_params={"table": "requests"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        body = result["body"]
+        self.assertIn("Tests Requested", body)
+        self.assertIn("VGCP-020", body)
+        self.assertNotIn("request_id", body)
+        self.assertNotIn("created_by", body)
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
     def test_tests_headers_capitalize_dat_oet(self, mock_crud, mock_logger):
         # Ensure DAT/OET tokens are capitalized in headers and included in correct order
         test_row = {

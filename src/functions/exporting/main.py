@@ -1,4 +1,3 @@
-import json
 import io
 import csv
 from datetime import date, datetime
@@ -8,8 +7,6 @@ from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.user_resolver import UserResolver
-from utils.db_utils import DbUtils
-
 
 ALLOWED_TABLES = {TableNames.CONTROLS, TableNames.TESTS, TableNames.REQUESTS}
 
@@ -28,7 +25,6 @@ def serialize_value(v):
 
 def fetch_rows(table):
     try:
-        # Use CrudUtils to fetch base rows, then enrich with referenced values
         if table == TableNames.TESTS:
             rows = CrudUtils.get_all(TableNames.TESTS)
             enriched = []
@@ -43,7 +39,9 @@ def fetch_rows(table):
 
                 ctrl_id = row.get("control_id")
                 if ctrl_id:
-                    ctrl = CrudUtils.get_by_id(TableNames.CONTROLS, "control_id", ctrl_id)
+                    ctrl = CrudUtils.get_by_id(
+                        TableNames.CONTROLS, "control_id", ctrl_id
+                    )
                     if ctrl:
                         row["control_vgcpid"] = ctrl.get("vgcpid")
                         row["control_description"] = ctrl.get("description")
@@ -69,13 +67,36 @@ def fetch_rows(table):
                     if user:
                         row["created_by_name"] = user.get("display_name")
                         row["created_by_email"] = user.get("email")
+                # gather VGCPIDs of tests that reference this request
+                try:
+                    tests = CrudUtils.get_all(TableNames.TESTS) or []
+                except Exception:
+                    tests = []
+                vgcpids = []
+                for t in tests:
+                    try:
+                        if t.get("request_id") == row.get("request_id"):
+                            ctrl_id = t.get("control_id")
+                            if ctrl_id:
+                                ctrl = CrudUtils.get_by_id(
+                                    TableNames.CONTROLS, "control_id", ctrl_id
+                                )
+                                if ctrl:
+                                    vgcpids.append(ctrl.get("vgcpid"))
+                    except Exception:
+                        continue
+                row["tests_requested"] = vgcpids
                 enriched.append(row)
             return enriched
 
         # default: controls
         return CrudUtils.get_all(TableNames.CONTROLS)
     except Exception as e:
-        Logger.log(level=LogLevels.ERROR, message="DB fetch failed", extra_fields={"error": str(e), "table": table})
+        Logger.log(
+            level=LogLevels.ERROR,
+            message="DB fetch failed",
+            extra_fields={"error": str(e), "table": table},
+        )
         raise
 
 
@@ -92,16 +113,18 @@ def format_controls_csv(rows):
     ]
     data = []
     for row in rows:
-        data.append([
-            serialize_value(row.get("vgcpid")),
-            serialize_value(row.get("description")),
-            serialize_value(row.get("control_owner")),
-            serialize_value(row.get("control_sme")),
-            serialize_value(row.get("escalation")),
-            serialize_value(row.get("is_active")),
-            serialize_value(row.get("date_created")),
-            serialize_value(row.get("last_tested")),
-        ])
+        data.append(
+            [
+                serialize_value(row.get("vgcpid")),
+                serialize_value(row.get("description")),
+                serialize_value(row.get("control_owner")),
+                serialize_value(row.get("control_sme")),
+                serialize_value(row.get("escalation")),
+                serialize_value(row.get("is_active")),
+                serialize_value(row.get("date_created")),
+                serialize_value(row.get("last_tested")),
+            ]
+        )
     return headers, data
 
 
@@ -127,10 +150,16 @@ def format_tests_csv(rows):
 
     # add remaining headers in original order, map DAT/OET to uppercase labels
     for key in rows[0].keys():
-        if key in excluded or key in ("control_vgcpid", "assigned_tester_name", "assigned_tester_email"):
+        if key in excluded or key in (
+            "control_vgcpid",
+            "assigned_tester_name",
+            "assigned_tester_email",
+        ):
             continue
         parts = key.split("_")
-        label = " ".join([p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts])
+        label = " ".join(
+            [p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts]
+        )
         headers.append(label)
 
     for row in rows:
@@ -139,7 +168,54 @@ def format_tests_csv(rows):
         row_vals.append(serialize_value(row.get("assigned_tester_name")))
         row_vals.append(serialize_value(row.get("assigned_tester_email")))
         for key in rows[0].keys():
-            if key in excluded or key in ("control_vgcpid", "assigned_tester_name", "assigned_tester_email"):
+            if key in excluded or key in (
+                "control_vgcpid",
+                "assigned_tester_name",
+                "assigned_tester_email",
+            ):
+                continue
+            row_vals.append(serialize_value(row.get(key)))
+        data.append(row_vals)
+
+    return headers, data
+
+
+def format_requests_csv(rows):
+    headers = [
+        "Requestor Name",
+        "Requestor Email",
+        "Tests Requested",
+    ]
+    data = []
+    if not rows:
+        return headers, data
+
+    excluded = {"request_id", "created_by"}
+
+    for key in rows[0].keys():
+        if key in excluded or key in (
+            "created_by_name",
+            "created_by_email",
+            "tests_requested",
+        ):
+            continue
+        parts = key.split("_")
+        label = " ".join(
+            [p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts]
+        )
+        headers.append(label)
+
+    for row in rows:
+        row_vals = []
+        row_vals.append(serialize_value(row.get("created_by_name")))
+        row_vals.append(serialize_value(row.get("created_by_email")))
+        row_vals.append(serialize_value(row.get("tests_requested")))
+        for key in rows[0].keys():
+            if key in excluded or key in (
+                "created_by_name",
+                "created_by_email",
+                "tests_requested",
+            ):
                 continue
             row_vals.append(serialize_value(row.get(key)))
         data.append(row_vals)
@@ -176,16 +252,24 @@ def lambda_handler(event, context):
             table = (params.get("table") or params.get("export") or "").lower()
 
             if not table:
-                Logger.log(level=LogLevels.ERROR, message="Missing 'table' query parameter")
+                Logger.log(
+                    level=LogLevels.ERROR, message="Missing 'table' query parameter"
+                )
                 return ResponseUtils.http_response(
-                    StatusCodes.BAD_REQUEST, {"error": "Missing 'table' query parameter"}
+                    StatusCodes.BAD_REQUEST,
+                    {"error": "Missing 'table' query parameter"},
                 )
 
             if table not in ALLOWED_TABLES:
-                Logger.log(level=LogLevels.WARNING, message="Invalid table requested", extra_fields={"table": table})
+                Logger.log(
+                    level=LogLevels.WARNING,
+                    message="Invalid table requested",
+                    extra_fields={"table": table},
+                )
                 allowed = ", ".join(sorted(ALLOWED_TABLES))
                 return ResponseUtils.http_response(
-                    StatusCodes.BAD_REQUEST, {"error": f"Invalid table. Allowed: {allowed}"}
+                    StatusCodes.BAD_REQUEST,
+                    {"error": f"Invalid table. Allowed: {allowed}"},
                 )
 
             # fetch rows and build CSV
@@ -204,35 +288,49 @@ def lambda_handler(event, context):
                 writer.writerow(headers)
                 for data in data_rows:
                     writer.writerow(data)
-            else:
-                if rows:
-                    headers = list(rows[0].keys())
-                    writer.writerow(headers)
-                    for row in rows:
-                        writer.writerow([serialize_value(row.get(h)) for h in headers])
+            elif table == TableNames.REQUESTS:
+                headers, data_rows = format_requests_csv(rows)
+                writer.writerow(headers)
+                for data in data_rows:
+                    writer.writerow(data)
 
             csv_text = output.getvalue()
             filename = f"{table}_export.csv"
 
-            Logger.log(level=LogLevels.INFO, message="Export successful", extra_fields={"table": table, "count": len(rows)})
+            Logger.log(
+                level=LogLevels.INFO,
+                message="Export successful",
+                extra_fields={"table": table, "count": len(rows)},
+            )
 
             return {
                 "statusCode": 200,
                 "isBase64Encoded": False,
                 "headers": {
                     "Content-Type": "text/csv",
-                    "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                    "Content-Disposition": f'attachment; filename="{filename}"',
                     "Access-Control-Allow-Origin": "*",
                 },
                 "body": csv_text,
             }
 
-        Logger.log(level=LogLevels.WARNING, message="Method not allowed", extra_fields={"method": method, "path": normalized_path})
+        Logger.log(
+            level=LogLevels.WARNING,
+            message="Method not allowed",
+            extra_fields={"method": method, "path": normalized_path},
+        )
         return ResponseUtils.http_response(
-            StatusCodes.METHOD_NOT_ALLOWED, {"error": f"Method {method} not allowed on path {normalized_path}"}
+            StatusCodes.METHOD_NOT_ALLOWED,
+            {"error": f"Method {method} not allowed on path {normalized_path}"},
         )
     except Exception as e:
-        Logger.log(level=LogLevels.ERROR, message="Error in export handler", extra_fields={"exception": str(e)})
-        return ResponseUtils.http_response(StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)})
+        Logger.log(
+            level=LogLevels.ERROR,
+            message="Error in export handler",
+            extra_fields={"exception": str(e)},
+        )
+        return ResponseUtils.http_response(
+            StatusCodes.INTERNAL_SERVER_ERROR, {"error": str(e)}
+        )
     finally:
         CrudUtils.clear_audit_context()
