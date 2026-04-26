@@ -123,11 +123,37 @@ def fetch_rows(table):
                 if vgcp:
                     request_to_vgcpids.setdefault(req_id, []).append(vgcp)
 
+            # prefetch users to avoid N+1 lookups per request
+            users = CrudUtils.get_all(TableNames.USERS) or []
+
+            user_map = {
+                u.get("user_id"): u
+                for u in users
+                if u and (u.get("display_name") or u.get("email"))
+            }
+
             for r in rows:
                 row = dict(r)
                 created_by = row.get("created_by")
+                user = None
                 if created_by:
-                    user = CrudUtils.get_by_id(TableNames.USERS, "user_id", created_by)
+                    user = user_map.get(created_by)
+                    if not user:
+                        try:
+                            user = CrudUtils.get_by_id(
+                                TableNames.USERS, "user_id", created_by
+                            )
+                        except Exception as e:
+                            Logger.log(
+                                level=LogLevels.WARNING,
+                                message="Failed to fetch user for request",
+                                extra_fields={
+                                    "user_id": created_by,
+                                    "request_id": row.get("request_id"),
+                                    "error": str(e),
+                                },
+                            )
+                            user = None
                     if user:
                         row["created_by_name"] = user.get("display_name")
                         row["created_by_email"] = user.get("email")
@@ -230,41 +256,28 @@ def format_tests_csv(rows):
 
 
 def format_requests_csv(rows):
-    headers = [
-        "Requestor Name",
-        "Requestor Email",
-        "Tests Requested",
-    ]
+    # Keep "Tests Requested" as the first column; auto-generate the rest
+    headers = ["Tests Requested"]
     data = []
     if not rows:
         return headers, data
 
     excluded = {"request_id", "created_by"}
 
+    # append headers from row keys in their existing order, skipping excluded and the tests_requested
     for key in rows[0].keys():
-        if key in excluded or key in (
-            "created_by_name",
-            "created_by_email",
-            "tests_requested",
-        ):
+        if key in excluded or key in ("tests_requested",):
             continue
         parts = key.split("_")
-        label = " ".join(
-            [p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts]
-        )
+        label = " ".join([p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts])
         headers.append(label)
 
     for row in rows:
         row_vals = []
-        row_vals.append(serialize_value(row.get("created_by_name")))
-        row_vals.append(serialize_value(row.get("created_by_email")))
+        # first value: Tests Requested
         row_vals.append(serialize_value(row.get("tests_requested")))
         for key in rows[0].keys():
-            if key in excluded or key in (
-                "created_by_name",
-                "created_by_email",
-                "tests_requested",
-            ):
+            if key in excluded or key in ("tests_requested",):
                 continue
             row_vals.append(serialize_value(row.get(key)))
         data.append(row_vals)
@@ -324,7 +337,7 @@ def lambda_handler(event, context):
             # fetch rows and build CSV
             rows = fetch_rows(table)
 
-            output = io.StringIO()
+            output = io.StringIO(newline="")
             writer = csv.writer(output)
 
             if table == TableNames.CONTROLS:
