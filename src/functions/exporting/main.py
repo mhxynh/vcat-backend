@@ -264,12 +264,13 @@ def format_requests_csv(rows):
 
     excluded = {"request_id", "created_by"}
 
-    # append headers from row keys in their existing order, skipping excluded and the tests_requested
     for key in rows[0].keys():
         if key in excluded or key in ("tests_requested",):
             continue
         parts = key.split("_")
-        label = " ".join([p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts])
+        label = " ".join(
+            [p.upper() if p.lower() in ("dat", "oet") else p.title() for p in parts]
+        )
         headers.append(label)
 
     for row in rows:
