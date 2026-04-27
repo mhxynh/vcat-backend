@@ -119,7 +119,7 @@ class TestControlsMain(TestCase):
         self.assertEqual(result["statusCode"], 409)
         self.assertEqual(
             json.loads(result["body"])["error"],
-            "Control ID 16560 already exists, please choose another ID",
+            "Control ID 16560 already exists, please choose another ID.",
         )
         mock_logger.log.assert_any_call(
             level="WARNING",
