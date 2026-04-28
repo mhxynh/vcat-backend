@@ -217,17 +217,59 @@ def lambda_handler(event, context):
             hard_delete = str(params.get("hard", "false")).lower() == "true"
             archive = str(params.get("archive", "true")).lower() != "false"
 
-            if hard_delete:
-                deleted = TestRepository.hard_delete(test_id)
-            else:
-                deleted = TestRepository.soft_delete(test_id, archive=archive)
-
-            if not deleted:
+            # Fetch the test to check its status and test_progress_step
+            test_record = TestRepository.get_tests_by_id(test_id)
+            if not test_record:
                 return ResponseUtils.http_response(
                     StatusCodes.NOT_FOUND, {"error": "Test not found"}
                 )
 
-            return ResponseUtils.http_response(StatusCodes.OK, deleted)
+            current_status = test_record.get("status", "NOT_STARTED")
+
+            if hard_delete:
+                # Check if status is COMPLETED - hard delete not allowed
+                if current_status == "COMPLETED":
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="Cannot hard delete completed test",
+                        extra_fields={"test_id": test_id, "status": current_status},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.CONFLICT,
+                        {
+                            "error": "Cannot hard delete completed test. Only archive/unarchive allowed.",
+                            "test_id": test_id,
+                            "status": current_status,
+                        },
+                    )
+
+                deleted = TestRepository.hard_delete(test_id)
+                if not deleted:
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                    )
+
+                Logger.log(
+                    level=LogLevels.INFO,
+                    message="Hard deleted test",
+                    extra_fields={"test_id": test_id, "status": current_status},
+                )
+                return ResponseUtils.http_response(StatusCodes.OK, deleted)
+            else:
+                # For archive/unarchive: any status except COMPLETED can be archived/unarchived
+                deleted = TestRepository.soft_delete(test_id, archive=archive)
+                if not deleted:
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                    )
+
+                action = "Archived" if archive else "Unarchived"
+                Logger.log(
+                    level=LogLevels.INFO,
+                    message=f"{action} test",
+                    extra_fields={"test_id": test_id, "status": current_status},
+                )
+                return ResponseUtils.http_response(StatusCodes.OK, deleted)
 
         return ResponseUtils.http_response(
             StatusCodes.METHOD_NOT_ALLOWED, {"error": "Method not allowed"}

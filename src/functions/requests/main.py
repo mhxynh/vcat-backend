@@ -200,6 +200,37 @@ def lambda_handler(event, context):
             hard = hard_flag == "true"
 
             if hard:
+                # Fetch the request to check its status
+                request_record = CrudUtils.get_by_id(
+                    TableNames.REQUESTS, "request_id", req_id
+                )
+                if not request_record:
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="Request not found for hard delete",
+                        extra_fields={"request_id": req_id},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND,
+                        {"error": "Request not found", "request_id": req_id},
+                    )
+
+                # Check if status is COMPLETED - hard delete not allowed
+                if request_record.get("status") == "COMPLETED":
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="Cannot hard delete completed request",
+                        extra_fields={"request_id": req_id, "status": "COMPLETED"},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.CONFLICT,
+                        {
+                            "error": "Cannot hard delete completed request. Only archive/unarchive allowed.",
+                            "request_id": req_id,
+                            "status": "COMPLETED",
+                        },
+                    )
+
                 deleted = CrudUtils.hard_delete(
                     TableNames.REQUESTS, "request_id", req_id
                 )
