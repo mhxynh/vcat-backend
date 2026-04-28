@@ -354,6 +354,18 @@ class TestTestsMain(TestCase):
         
         self.assertEqual(result["statusCode"], 404)
 
+    @patch('functions.tests.main.TestRepository')
+    def test_delete_hard_delete_fails_returns_404(self, mock_repo):
+        # Test when get_tests_by_id returns a record but hard_delete fails
+        mock_repo.get_tests_by_id.return_value = {"test_id": "42", "status": "NOT_STARTED"}
+        mock_repo.hard_delete.return_value = None
+        event = self._build_event("DELETE", "/tests/42", query_params={"hard": "true"})
+        event["pathParameters"] = {"test_id": "42", "id": "42"}
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 404)
+
     def test_unsupported_method_returns_405(self):
         event = self._build_event("PATCH", "/tests")
         result = tests_main.lambda_handler(event, None)
