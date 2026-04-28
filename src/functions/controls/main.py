@@ -1,10 +1,33 @@
 import json
+import re
 from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
+
+VGCPID_UNIQUE_CONSTRAINT = "controls_vgcpid_key"
+
+
+def _duplicate_vgcpid_message(error):
+    constraint_name = getattr(getattr(error, "diag", None), "constraint_name", None)
+    error_text = str(error)
+
+    if (
+        constraint_name != VGCPID_UNIQUE_CONSTRAINT
+        and VGCPID_UNIQUE_CONSTRAINT not in error_text
+    ):
+        return None
+
+    detail = getattr(getattr(error, "diag", None), "message_detail", "") or error_text
+    match = re.search(r"Key \(vgcpid\)=\(([^)]+)\)", detail)
+
+    if not match:
+        return "Control ID already exists, please choose another ID."
+
+    control_id = re.sub(r"^VGCP-", "", match.group(1), flags=re.IGNORECASE)
+    return f"Control ID {control_id} already exists, please choose another ID."
 
 
 def lambda_handler(event, context):
@@ -270,6 +293,17 @@ def lambda_handler(event, context):
             {"error": f"Method {method} not allowed on path {normalized_path}"},
         )
     except Exception as e:
+        duplicate_message = _duplicate_vgcpid_message(e)
+        if duplicate_message:
+            Logger.log(
+                level=LogLevels.WARNING,
+                message="Duplicate control ID",
+                extra_fields={"exception": str(e)},
+            )
+            return ResponseUtils.http_response(
+                StatusCodes.CONFLICT, {"error": duplicate_message}
+            )
+
         Logger.log(
             level=LogLevels.ERROR,
             message="Error in controls handler",

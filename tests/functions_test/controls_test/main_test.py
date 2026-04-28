@@ -98,6 +98,35 @@ class TestControlsMain(TestCase):
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("missing", json.loads(result["body"]))
 
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
+    def test_post_duplicate_control_returns_readable_409(self, mock_crud, mock_logger):
+        duplicate_error = Exception(
+            'duplicate key value violates unique constraint "controls_vgcpid_key"\n'
+            "DETAIL: Key (vgcpid)=(VGCP-16560) already exists."
+        )
+        mock_crud.create.side_effect = duplicate_error
+        new_control = {
+            "vgcpid": "VGCP-16560",
+            "description": "New",
+            "control_owner": "Owner",
+            "escalation": True,
+        }
+
+        event = self._build_event("POST", "/controls", body=new_control)
+        result = controls.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 409)
+        self.assertEqual(
+            json.loads(result["body"])["error"],
+            "Control ID 16560 already exists, please choose another ID.",
+        )
+        mock_logger.log.assert_any_call(
+            level="WARNING",
+            message="Duplicate control ID",
+            extra_fields={"exception": str(duplicate_error)},
+        )
+
     # PUT /controls/{vgcpid}
 
     @patch('functions.controls.main.Logger')
