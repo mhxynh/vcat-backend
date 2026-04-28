@@ -22,9 +22,11 @@ def _duplicate_vgcpid_message(error):
 
     detail = getattr(getattr(error, "diag", None), "message_detail", "") or error_text
     match = re.search(r"Key \(vgcpid\)=\(([^)]+)\)", detail)
-    control_id = match.group(1) if match else "that"
-    control_id = re.sub(r"^VGCP-", "", control_id, flags=re.IGNORECASE)
 
+    if not match:
+        return "Control ID already exists, please choose another ID."
+
+    control_id = re.sub(r"^VGCP-", "", match.group(1), flags=re.IGNORECASE)
     return f"Control ID {control_id} already exists, please choose another ID."
 
 
