@@ -200,6 +200,38 @@ def lambda_handler(event, context):
             hard = hard_flag == "true"
 
             if hard:
+                # Fetch the request to check its status
+                request_record = CrudUtils.get_by_id(
+                    TableNames.REQUESTS, "request_id", req_id
+                )
+                if not request_record:
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="Request not found for hard delete",
+                        extra_fields={"request_id": req_id},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND,
+                        {"error": "Request not found", "request_id": req_id},
+                    )
+
+                # Check if status is COMPLETED - hard delete not allowed
+                if request_record.get("status") == "COMPLETED":
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="Cannot hard delete completed request",
+                        extra_fields={"request_id": req_id, "status": "COMPLETED"},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.CONFLICT,
+                        {
+                            "error": "Cannot hard delete completed request. "
+                            "Only archive/unarchive allowed.",
+                            "request_id": req_id,
+                            "status": "COMPLETED",
+                        },
+                    )
+
                 deleted = CrudUtils.hard_delete(
                     TableNames.REQUESTS, "request_id", req_id
                 )
@@ -221,13 +253,25 @@ def lambda_handler(event, context):
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
             else:
+                archive_flag = (
+                    str(params.get("archive", "true")).lower() if params else "true"
+                )
+                should_archive = archive_flag != "false"
+                target_status = "ARCHIVED" if should_archive else "NOT_STARTED"
                 archived = CrudUtils.update(
-                    TableNames.REQUESTS, "request_id", req_id, {"status": "ARCHIVED"}
+                    TableNames.REQUESTS,
+                    "request_id",
+                    req_id,
+                    {"status": target_status},
                 )
                 if not archived:
                     Logger.log(
                         level=LogLevels.WARNING,
-                        message="Request not found for archive",
+                        message=(
+                            "Request not found for archive"
+                            if should_archive
+                            else "Request not found for unarchive"
+                        ),
                         extra_fields={"request_id": req_id},
                     )
                     return ResponseUtils.http_response(
@@ -237,8 +281,10 @@ def lambda_handler(event, context):
 
                 Logger.log(
                     level=LogLevels.INFO,
-                    message="Archived request",
-                    extra_fields={"request_id": req_id},
+                    message=(
+                        "Archived request" if should_archive else "Unarchived request"
+                    ),
+                    extra_fields={"request_id": req_id, "status": target_status},
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, archived)
 

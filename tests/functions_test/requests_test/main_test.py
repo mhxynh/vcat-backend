@@ -163,9 +163,27 @@ class TestRequestsMain(TestCase):
 		event = self._build_event("DELETE", "/requests/42", path_params={"id": "42"})
 		result = requests.lambda_handler(event, None)
 
-		mock_logger.log.assert_any_call(level="INFO", message="Archived request", extra_fields={"request_id": '42'})
+		mock_logger.log.assert_any_call(level="INFO", message="Archived request", extra_fields={"request_id": '42', "status": "ARCHIVED"})
 		self.assertEqual(result["statusCode"], 200)
 		self.assertEqual(json.loads(result["body"])["status"], "ARCHIVED")
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_delete_request_soft_unarchive_returns_200(self, mock_crud, mock_logger):
+		mock_crud.update.return_value = {"request_id": 42, "status": "NOT_STARTED"}
+
+		event = self._build_event(
+			"DELETE",
+			"/requests/42",
+			path_params={"id": "42"},
+			query_params={"archive": "false"},
+		)
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.update.assert_called_once_with("requests", "request_id", '42', {"status": "NOT_STARTED"})
+		mock_logger.log.assert_any_call(level="INFO", message="Unarchived request", extra_fields={"request_id": '42', "status": "NOT_STARTED"})
+		self.assertEqual(result["statusCode"], 200)
+		self.assertEqual(json.loads(result["body"])["status"], "NOT_STARTED")
 
 	@patch('functions.requests.main.Logger')
 	@patch('functions.requests.main.CrudUtils')
@@ -189,6 +207,23 @@ class TestRequestsMain(TestCase):
 		result = requests.lambda_handler(event, None)
 
 		mock_logger.log.assert_any_call(level="WARNING", message="Request not found for archive", extra_fields={"request_id": '999'})
+		self.assertEqual(result["statusCode"], 404)
+		self.assertIn("Request not found", json.loads(result["body"])['error'])
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_delete_request_unarchive_not_found_returns_404(self, mock_crud, mock_logger):
+		mock_crud.update.return_value = None
+
+		event = self._build_event(
+			"DELETE",
+			"/requests/999",
+			path_params={"id": "999"},
+			query_params={"archive": "false"},
+		)
+		result = requests.lambda_handler(event, None)
+
+		mock_logger.log.assert_any_call(level="WARNING", message="Request not found for unarchive", extra_fields={"request_id": '999'})
 		self.assertEqual(result["statusCode"], 404)
 		self.assertIn("Request not found", json.loads(result["body"])['error'])
 
@@ -224,6 +259,94 @@ class TestRequestsMain(TestCase):
 		result = requests.lambda_handler(event, None)
 
 		self.assertEqual(result["statusCode"], 405)
+
+	# Authorization checks
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_post_request_non_manager_returns_403(self, mock_crud, mock_logger):
+		self.mock_auth.is_manager.return_value = False
+		new_req = {"requestor": "random", "created_by": 1, "due_date": "2026-03-01", "priority": "HIGH"}
+
+		event = self._build_event("POST", "/requests", body=new_req)
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.create.assert_not_called()
+		mock_logger.log.assert_any_call(level="WARNING", message="Unauthorized request creation attempt")
+		self.assertEqual(result["statusCode"], 403)
+		self.assertIn("Forbidden", json.loads(result["body"])['error'])
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_put_request_non_manager_returns_403(self, mock_crud, mock_logger):
+		self.mock_auth.is_manager.return_value = False
+
+		event = self._build_event("PUT", "/requests/42", body={"priority": "HIGH"}, path_params={"id": "42"})
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.update.assert_not_called()
+		mock_logger.log.assert_any_call(level="WARNING", message="Unauthorized request update attempt")
+		self.assertEqual(result["statusCode"], 403)
+		self.assertIn("Forbidden", json.loads(result["body"])['error'])
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_delete_request_non_manager_returns_403(self, mock_crud, mock_logger):
+		self.mock_auth.is_manager.return_value = False
+
+		event = self._build_event("DELETE", "/requests/42", path_params={"id": "42"})
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.update.assert_not_called()
+		mock_logger.log.assert_any_call(level="WARNING", message="Unauthorized request deletion attempt")
+		self.assertEqual(result["statusCode"], 403)
+		self.assertIn("Forbidden", json.loads(result["body"])['error'])
+
+	# Hard delete constraints
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_hard_delete_completed_request_returns_409(self, mock_crud, mock_logger):
+		completed_request = {"request_id": 42, "status": "COMPLETED"}
+		mock_crud.get_by_id.return_value = completed_request
+
+		event = self._build_event("DELETE", "/requests/42", path_params={"id": "42"}, query_params={"hard": "true"})
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.hard_delete.assert_not_called()
+		mock_logger.log.assert_any_call(
+			level="WARNING",
+			message="Cannot hard delete completed request",
+			extra_fields={"request_id": '42', "status": "COMPLETED"}
+		)
+		self.assertEqual(result["statusCode"], 409)
+		self.assertIn("Cannot hard delete completed", json.loads(result["body"])['error'])
+
+	@patch('functions.requests.main.Logger')
+	@patch('functions.requests.main.CrudUtils')
+	def test_hard_delete_request_check_status_not_found_returns_404(self, mock_crud, mock_logger):
+		mock_crud.get_by_id.return_value = None
+
+		event = self._build_event("DELETE", "/requests/42", path_params={"id": "42"}, query_params={"hard": "true"})
+		result = requests.lambda_handler(event, None)
+
+		mock_crud.hard_delete.assert_not_called()
+		mock_logger.log.assert_any_call(
+			level="WARNING",
+			message="Request not found for hard delete",
+			extra_fields={"request_id": '42'}
+		)
+		self.assertEqual(result["statusCode"], 404)
+
+	# OPTIONS preflight
+
+	@patch('functions.requests.main.Logger')
+	def test_options_request_returns_cors_preflight(self, mock_logger):
+		event = self._build_event("OPTIONS", "/requests")
+		result = requests.lambda_handler(event, None)
+
+		self.assertEqual(result["statusCode"], 200)
+		self.assertIn("Access-Control-Allow-Origin", result["headers"])
 
 	# Exception handling
 

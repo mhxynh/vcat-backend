@@ -177,6 +177,15 @@ def lambda_handler(event, context):
                     body.get("description"),
                     body.get("evidence_links"),
                 )
+            elif action == "update_status":
+                if "status" not in body:
+                    return ResponseUtils.http_response(
+                        StatusCodes.BAD_REQUEST,
+                        {"error": "status is required for update_status action"},
+                    )
+                updated_record = TestRepository.update_status(
+                    test_id, body.get("status")
+                )
             else:
                 return ResponseUtils.http_response(
                     StatusCodes.BAD_REQUEST, {"error": "Invalid or missing action"}
@@ -208,18 +217,66 @@ def lambda_handler(event, context):
 
             params = event.get("queryStringParameters") or {}
             hard_delete = str(params.get("hard", "false")).lower() == "true"
+            archive = str(params.get("archive", "true")).lower() != "false"
 
             if hard_delete:
+                # Fetch the test only for hard delete to check COMPLETED constraint
+                test_record = TestRepository.get_tests_by_id(test_id)
+                if not test_record:
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                    )
+
+                current_status = test_record.get("status", "NOT_STARTED")
+
+                # Check if status is COMPLETED - hard delete not allowed
+                if current_status == "COMPLETED":
+                    Logger.log(
+                        level=LogLevels.WARNING,
+                        message="Cannot hard delete completed test",
+                        extra_fields={"test_id": test_id, "status": current_status},
+                    )
+                    return ResponseUtils.http_response(
+                        StatusCodes.CONFLICT,
+                        {
+                            "error": "Cannot hard delete completed test."
+                            "Only archive/unarchive allowed.",
+                            "test_id": test_id,
+                            "status": current_status,
+                        },
+                    )
+
                 deleted = TestRepository.hard_delete(test_id)
-            else:
-                deleted = TestRepository.soft_delete(test_id)
+                if not deleted:
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                    )
 
-            if not deleted:
-                return ResponseUtils.http_response(
-                    StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                Logger.log(
+                    level=LogLevels.INFO,
+                    message="Hard deleted test",
+                    extra_fields={"test_id": test_id, "status": current_status},
                 )
+                return ResponseUtils.http_response(StatusCodes.OK, deleted)
+            else:
+                # Archive/unarchive path: no pre-fetch needed
+                # soft_delete will return None if record doesn't exist
+                deleted = TestRepository.soft_delete(test_id, archive=archive)
+                if not deleted:
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                    )
 
-            return ResponseUtils.http_response(StatusCodes.OK, deleted)
+                action = "Archived" if archive else "Unarchived"
+                Logger.log(
+                    level=LogLevels.INFO,
+                    message=f"{action} test",
+                    extra_fields={
+                        "test_id": test_id,
+                        "status": deleted.get("status"),
+                    },
+                )
+                return ResponseUtils.http_response(StatusCodes.OK, deleted)
 
         return ResponseUtils.http_response(
             StatusCodes.METHOD_NOT_ALLOWED, {"error": "Method not allowed"}
