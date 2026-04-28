@@ -600,13 +600,13 @@ class TestRepository:
                     """
                     cur.execute(query, (target_status, test_id))
                     row = cur.fetchone()
-                    archived = dict(row) if row else None
+                    updated = dict(row) if row else None
                     if archive:
-                        TestAuditUtils.audit_soft_delete(cur, before_row, archived)
+                        TestAuditUtils.audit_soft_delete(cur, before_row, updated)
                     else:
-                        TestAuditUtils.audit_update(cur, before_row, archived)
+                        TestAuditUtils.audit_update(cur, before_row, updated)
                     conn.commit()
-                    return archived
+                    return updated
             finally:
                 conn.close()
         except Exception as e:

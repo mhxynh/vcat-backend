@@ -259,7 +259,7 @@ def lambda_handler(event, context):
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
             else:
-                # Any status except COMPLETED can be archived/unarchived
+                # Archive/unarchive is allowed here; only hard delete is blocked for COMPLETED tests.
                 deleted = TestRepository.soft_delete(test_id, archive=archive)
                 if not deleted:
                     return ResponseUtils.http_response(
@@ -270,7 +270,10 @@ def lambda_handler(event, context):
                 Logger.log(
                     level=LogLevels.INFO,
                     message=f"{action} test",
-                    extra_fields={"test_id": test_id, "status": current_status},
+                    extra_fields={
+                        "test_id": test_id,
+                        "status": deleted.get("status", current_status),
+                    },
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
 
