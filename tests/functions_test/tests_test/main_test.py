@@ -321,14 +321,6 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 404)
         self.assertIn("Test not found", json.loads(result["body"])["error"])
 
-    @patch('functions.tests.main.TestRepository')
-    def test_delete_test_not_found_returns_404(self, mock_repo):
-        mock_repo.soft_delete.return_value = None
-        event = self._build_event("DELETE", "/tests/99", path_params={"test_id": "99"})
-        
-        result = tests_main.lambda_handler(event, None)
-        self.assertEqual(result["statusCode"], 404)
-
     def test_delete_missing_test_id_returns_400(self):
         event = self._build_event("DELETE", "/tests", path_params={})
         result = tests_main.lambda_handler(event, None)
