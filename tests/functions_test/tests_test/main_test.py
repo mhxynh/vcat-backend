@@ -312,6 +312,17 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 200)
 
     @patch('functions.tests.main.TestRepository')
+    def test_delete_test_soft_delete_not_found_returns_404(self, mock_repo):
+        mock_repo.get_tests_by_id.return_value = {"test_id": "42", "status": "NOT_STARTED"}
+        mock_repo.soft_delete.return_value = None
+        event = self._build_event("DELETE", "/tests/42", path_params={"test_id": "42"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 404)
+        self.assertIn("Test not found", json.loads(result["body"])["error"])
+
+    @patch('functions.tests.main.TestRepository')
     def test_delete_test_not_found_returns_404(self, mock_repo):
         mock_repo.soft_delete.return_value = None
         event = self._build_event("DELETE", "/tests/99", path_params={"test_id": "99"})
@@ -416,6 +427,131 @@ class TestTestsMain(TestCase):
         result = tests_main.lambda_handler(event, None)
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("Missing required fields", json.loads(result["body"])["error"])
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_evidence_links_not_list_returns_400(self, mock_repo):
+        event = self._build_event(
+            "PUT",
+            "/tests/42",
+            body={
+                "action": "update_evidence_links",
+                "evidence_links": "not a list",  # Invalid: string instead of list
+            },
+            path_params={"test_id": "42"},
+        )
+
+        result = tests_main.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("evidence_links must be a list", json.loads(result["body"])["error"])
+
+    # Authorization checks
+
+    @patch('functions.tests.main.Logger')
+    @patch('functions.tests.main.TestRepository')
+    def test_post_test_non_manager_returns_403(self, mock_repo, mock_logger):
+        self.mock_auth.is_manager.return_value = False
+        body = {
+            "vgcpid": "VGCP-001", "request_id": 100, "requires_dat": True, 
+            "requires_oet": False, "due_date": "2026-03-01", "description": "Test control"
+        }
+        event = self._build_event("POST", "/tests", body=body)
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.create.assert_not_called()
+        mock_logger.log.assert_any_call(level="WARNING", message="Unauthorized test creation attempt")
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_test_non_manager_non_tester_returns_403(self, mock_repo):
+        self.mock_auth.is_manager.return_value = False
+        self.mock_auth.is_tester.return_value = False
+        
+        event = self._build_event("PUT", "/tests/42", body={"action": "start"}, path_params={"test_id": "42"})
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.start_test.assert_not_called()
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
+    @patch('functions.tests.main.Logger')
+    @patch('functions.tests.main.TestRepository')
+    def test_delete_test_non_manager_returns_403(self, mock_repo, mock_logger):
+        self.mock_auth.is_manager.return_value = False
+        
+        event = self._build_event("DELETE", "/tests/42", path_params={"test_id": "42"})
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.soft_delete.assert_not_called()
+        mock_logger.log.assert_any_call(level="WARNING", message="Unauthorized test deletion attempt")
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
+    # Hard delete constraints
+
+    @patch('functions.tests.main.Logger')
+    @patch('functions.tests.main.TestRepository')
+    def test_hard_delete_completed_test_returns_409(self, mock_repo, mock_logger):
+        completed_test = {"test_id": "42", "status": "COMPLETED"}
+        mock_repo.get_tests_by_id.return_value = completed_test
+        
+        event = self._build_event("DELETE", "/tests/42", path_params={"test_id": "42"}, query_params={"hard": "true"})
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.hard_delete.assert_not_called()
+        mock_logger.log.assert_any_call(
+            level="WARNING",
+            message="Cannot hard delete completed test",
+            extra_fields={"test_id": "42", "status": "COMPLETED"}
+        )
+        self.assertEqual(result["statusCode"], 409)
+        self.assertIn("Cannot hard delete completed", json.loads(result["body"])["error"])
+
+    @patch('functions.tests.main.Logger')
+    @patch('functions.tests.main.TestRepository')
+    def test_delete_test_not_found_returns_404(self, mock_repo, mock_logger):
+        mock_repo.get_tests_by_id.return_value = None
+        event = self._build_event("DELETE", "/tests/99", path_params={"test_id": "99"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.soft_delete.assert_not_called()
+        self.assertEqual(result["statusCode"], 404)
+        self.assertIn("Test not found", json.loads(result["body"])["error"])
+
+    # Update status action
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_status_returns_200(self, mock_repo):
+        mock_repo.update_status.return_value = {"test_id": "42", "status": "IN_REVIEW"}
+        event = self._build_event("PUT", "/tests/42", body={"action": "update_status", "status": "IN_REVIEW"}, path_params={"test_id": "42"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        mock_repo.update_status.assert_called_once_with("42", "IN_REVIEW")
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(json.loads(result["body"])["status"], "IN_REVIEW")
+
+    @patch('functions.tests.main.TestRepository')
+    def test_put_action_update_status_missing_status_returns_400(self, mock_repo):
+        event = self._build_event("PUT", "/tests/42", body={"action": "update_status"}, path_params={"test_id": "42"})
+        
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 400)
+        self.assertIn("status is required", json.loads(result["body"])["error"])
+
+    # OPTIONS preflight
+
+    @patch('functions.tests.main.Logger')
+    def test_options_request_returns_cors_preflight(self, mock_logger):
+        event = {"httpMethod": "OPTIONS", "path": "/tests"}
+        result = tests_main.lambda_handler(event, None)
+        
+        self.assertEqual(result["statusCode"], 200)
+        self.assertIn("Access-Control-Allow-Origin", result["headers"])
 
     def test_put_with_missing_body_key(self):
         event = self._build_event("PUT", "/tests/42", path_params={"test_id": "42"})
