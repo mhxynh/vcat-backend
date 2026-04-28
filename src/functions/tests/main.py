@@ -183,7 +183,9 @@ def lambda_handler(event, context):
                         StatusCodes.BAD_REQUEST,
                         {"error": "status is required for update_status action"},
                     )
-                updated_record = TestRepository.update_status(test_id, body.get("status"))
+                updated_record = TestRepository.update_status(
+                    test_id, body.get("status")
+                )
             else:
                 return ResponseUtils.http_response(
                     StatusCodes.BAD_REQUEST, {"error": "Invalid or missing action"}
@@ -237,7 +239,8 @@ def lambda_handler(event, context):
                     return ResponseUtils.http_response(
                         StatusCodes.CONFLICT,
                         {
-                            "error": "Cannot hard delete completed test. Only archive/unarchive allowed.",
+                            "error": "Cannot hard delete completed test."
+                            "Only archive/unarchive allowed.",
                             "test_id": test_id,
                             "status": current_status,
                         },
@@ -256,7 +259,7 @@ def lambda_handler(event, context):
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
             else:
-                # For archive/unarchive: any status except COMPLETED can be archived/unarchived
+                # Any status except COMPLETED can be archived/unarchived
                 deleted = TestRepository.soft_delete(test_id, archive=archive)
                 if not deleted:
                     return ResponseUtils.http_response(

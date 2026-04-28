@@ -225,7 +225,8 @@ def lambda_handler(event, context):
                     return ResponseUtils.http_response(
                         StatusCodes.CONFLICT,
                         {
-                            "error": "Cannot hard delete completed request. Only archive/unarchive allowed.",
+                            "error": "Cannot hard delete completed request."
+                            "Only archive/unarchive allowed.",
                             "request_id": req_id,
                             "status": "COMPLETED",
                         },
@@ -280,7 +281,9 @@ def lambda_handler(event, context):
 
                 Logger.log(
                     level=LogLevels.INFO,
-                    message="Archived request" if should_archive else "Unarchived request",
+                    message=(
+                        "Archived request" if should_archive else "Unarchived request"
+                    ),
                     extra_fields={"request_id": req_id, "status": target_status},
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, archived)
