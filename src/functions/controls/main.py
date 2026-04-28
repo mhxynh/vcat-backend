@@ -7,7 +7,6 @@ from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
 
-
 VGCPID_UNIQUE_CONSTRAINT = "controls_vgcpid_key"
 
 
