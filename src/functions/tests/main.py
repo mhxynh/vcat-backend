@@ -259,7 +259,8 @@ def lambda_handler(event, context):
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
             else:
-                # Archive/unarchive is allowed here; only hard delete is blocked for COMPLETED tests.
+                # Archive/unarchive is allowed here
+                # Only hard delete is blocked for COMPLETED tests
                 deleted = TestRepository.soft_delete(test_id, archive=archive)
                 if not deleted:
                     return ResponseUtils.http_response(
