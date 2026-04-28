@@ -219,16 +219,16 @@ def lambda_handler(event, context):
             hard_delete = str(params.get("hard", "false")).lower() == "true"
             archive = str(params.get("archive", "true")).lower() != "false"
 
-            # Fetch the test to check its status and test_progress_step
-            test_record = TestRepository.get_tests_by_id(test_id)
-            if not test_record:
-                return ResponseUtils.http_response(
-                    StatusCodes.NOT_FOUND, {"error": "Test not found"}
-                )
-
-            current_status = test_record.get("status", "NOT_STARTED")
-
             if hard_delete:
+                # Fetch the test only for hard delete to check COMPLETED constraint
+                test_record = TestRepository.get_tests_by_id(test_id)
+                if not test_record:
+                    return ResponseUtils.http_response(
+                        StatusCodes.NOT_FOUND, {"error": "Test not found"}
+                    )
+
+                current_status = test_record.get("status", "NOT_STARTED")
+
                 # Check if status is COMPLETED - hard delete not allowed
                 if current_status == "COMPLETED":
                     Logger.log(
@@ -259,8 +259,8 @@ def lambda_handler(event, context):
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)
             else:
-                # Archive/unarchive is allowed here
-                # Only hard delete is blocked for COMPLETED tests
+                # Archive/unarchive path: no pre-fetch needed
+                # soft_delete will return None if record doesn't exist
                 deleted = TestRepository.soft_delete(test_id, archive=archive)
                 if not deleted:
                     return ResponseUtils.http_response(
@@ -273,7 +273,7 @@ def lambda_handler(event, context):
                     message=f"{action} test",
                     extra_fields={
                         "test_id": test_id,
-                        "status": deleted.get("status", current_status),
+                        "status": deleted.get("status"),
                     },
                 )
                 return ResponseUtils.http_response(StatusCodes.OK, deleted)

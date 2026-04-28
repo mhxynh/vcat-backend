@@ -313,7 +313,6 @@ class TestTestsMain(TestCase):
 
     @patch('functions.tests.main.TestRepository')
     def test_delete_test_soft_delete_not_found_returns_404(self, mock_repo):
-        mock_repo.get_tests_by_id.return_value = {"test_id": "42", "status": "NOT_STARTED"}
         mock_repo.soft_delete.return_value = None
         event = self._build_event("DELETE", "/tests/42", path_params={"test_id": "42"})
         
@@ -347,7 +346,7 @@ class TestTestsMain(TestCase):
 
     @patch('functions.tests.main.TestRepository')
     def test_delete_hard_delete_not_found_returns_404(self, mock_repo):
-        mock_repo.hard_delete.return_value = None
+        mock_repo.get_tests_by_id.return_value = None
         event = self._build_event("DELETE", "/tests/42", query_params={"hard": "true"})
         event["pathParameters"] = {"test_id": "42", "id": "42"}
         
@@ -512,12 +511,12 @@ class TestTestsMain(TestCase):
     @patch('functions.tests.main.Logger')
     @patch('functions.tests.main.TestRepository')
     def test_delete_test_not_found_returns_404(self, mock_repo, mock_logger):
-        mock_repo.get_tests_by_id.return_value = None
+        mock_repo.soft_delete.return_value = None
         event = self._build_event("DELETE", "/tests/99", path_params={"test_id": "99"})
         
         result = tests_main.lambda_handler(event, None)
         
-        mock_repo.soft_delete.assert_not_called()
+        mock_repo.soft_delete.assert_called_once_with("99", archive=True)
         self.assertEqual(result["statusCode"], 404)
         self.assertIn("Test not found", json.loads(result["body"])["error"])
 
