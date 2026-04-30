@@ -1,12 +1,16 @@
 import io
 import csv
 from datetime import date, datetime
+import os
+import tempfile
+import uuid
 
 from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.user_resolver import UserResolver
+from utils.s3_utils import S3Utils
 
 ALLOWED_TABLES = {TableNames.CONTROLS, TableNames.TESTS, TableNames.REQUESTS}
 
@@ -286,6 +290,108 @@ def format_requests_csv(rows):
     return headers, data
 
 
+def build_export_response(table, rows):
+    tmp = None
+    try:
+        tmp = tempfile.NamedTemporaryFile(mode="w", newline="", delete=False, encoding="utf-8")
+        writer = csv.writer(tmp)
+
+        if table == TableNames.CONTROLS:
+            headers, data_rows = format_controls_csv(rows)
+            writer.writerow(headers)
+            for data in data_rows:
+                writer.writerow(data)
+        elif table == TableNames.TESTS:
+            headers, data_rows = format_tests_csv(rows)
+            writer.writerow(headers)
+            for data in data_rows:
+                writer.writerow(data)
+        elif table == TableNames.REQUESTS:
+            headers, data_rows = format_requests_csv(rows)
+            writer.writerow(headers)
+            for data in data_rows:
+                writer.writerow(data)
+
+        tmp.flush()
+        tmp.close()
+
+        bucket = os.environ.get("EXPORT_BUCKET_NAME")
+        presign_ttl = int(os.environ.get("PRESIGNED_URL_TTL_SECONDS", "900"))
+
+        FILENAME_MAP = {
+            TableNames.CONTROLS: "control_export.csv",
+            TableNames.TESTS: "test_export.csv",
+            TableNames.REQUESTS: "request_export.csv",
+        }
+        filename = FILENAME_MAP.get(table, f"{table}_export.csv")
+        if not bucket:
+            Logger.log(
+                level=LogLevels.ERROR,
+                message="Export bucket not configured",
+                extra_fields={"table": table},
+            )
+            return ResponseUtils.http_response(
+                StatusCodes.INTERNAL_SERVER_ERROR,
+                {"error": "EXPORT_BUCKET_NAME not configured"},
+            )
+
+        prefix = os.environ.get("EXPORT_KEY_PREFIX", "exports/")
+        normalized_prefix = (prefix or "").strip("/")
+        if normalized_prefix:
+            normalized_prefix = f"{normalized_prefix}/"
+
+        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        unique = uuid.uuid4().hex
+        object_key = f"{normalized_prefix}{timestamp}-{unique}-{filename}"
+
+        try:
+            with open(tmp.name, "rb") as fh:
+                S3Utils.get_client().upload_fileobj(
+                    fh,
+                    bucket,
+                    object_key,
+                    ExtraArgs={"ContentType": "text/csv"},
+                )
+
+            # generate presigned GET URL
+            download_url = S3Utils.get_client().generate_presigned_url(
+                "get_object",
+                Params={
+                    "Bucket": bucket,
+                    "Key": object_key,
+                    "ResponseContentDisposition": f'attachment; filename="{filename}"',
+                },
+                ExpiresIn=presign_ttl,
+            )
+
+            Logger.log(
+                level=LogLevels.INFO,
+                message="Export uploaded to S3",
+                extra_fields={"table": table, "count": len(rows), "bucket": bucket, "key": object_key},
+            )
+
+            return ResponseUtils.http_response(
+                StatusCodes.OK,
+                {"download_url": download_url, "bucket": bucket, "key": object_key, "filename": filename},
+            )
+        except Exception as e:
+            Logger.log(
+                level=LogLevels.ERROR,
+                message="Failed to upload export to S3",
+                extra_fields={"error": str(e), "table": table},
+            )
+            return ResponseUtils.http_response(
+                StatusCodes.INTERNAL_SERVER_ERROR,
+                {"error": "Failed to upload export to S3", "details": str(e)},
+            )
+    finally:
+        try:
+            if tmp is not None:
+                os.unlink(tmp.name)
+        except Exception:
+            pass
+
+
 def lambda_handler(event, context):
     method = event.get("httpMethod")
 
@@ -335,47 +441,9 @@ def lambda_handler(event, context):
                     {"error": f"Invalid table. Allowed: {allowed}"},
                 )
 
-            # fetch rows and build CSV
+            # fetch rows and build CSV (uploads to S3 when configured)
             rows = fetch_rows(table)
-
-            output = io.StringIO(newline="")
-            writer = csv.writer(output)
-
-            if table == TableNames.CONTROLS:
-                headers, data_rows = format_controls_csv(rows)
-                writer.writerow(headers)
-                for data in data_rows:
-                    writer.writerow(data)
-            elif table == TableNames.TESTS:
-                headers, data_rows = format_tests_csv(rows)
-                writer.writerow(headers)
-                for data in data_rows:
-                    writer.writerow(data)
-            elif table == TableNames.REQUESTS:
-                headers, data_rows = format_requests_csv(rows)
-                writer.writerow(headers)
-                for data in data_rows:
-                    writer.writerow(data)
-
-            csv_text = output.getvalue()
-            filename = f"{table}_export.csv"
-
-            Logger.log(
-                level=LogLevels.INFO,
-                message="Export successful",
-                extra_fields={"table": table, "count": len(rows)},
-            )
-
-            return {
-                "statusCode": 200,
-                "isBase64Encoded": False,
-                "headers": {
-                    "Content-Type": "text/csv",
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                    "Access-Control-Allow-Origin": "*",
-                },
-                "body": csv_text,
-            }
+            return build_export_response(table, rows)
 
         Logger.log(
             level=LogLevels.WARNING,
