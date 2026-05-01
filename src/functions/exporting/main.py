@@ -1,4 +1,3 @@
-import io
 import csv
 from datetime import date, datetime
 import os
@@ -12,7 +11,12 @@ from utils.response import ResponseUtils
 from utils.user_resolver import UserResolver
 from utils.s3_utils import S3Utils
 
-ALLOWED_TABLES = {TableNames.CONTROLS, TableNames.TESTS, TableNames.REQUESTS}
+ALLOWED_TABLES = {
+    TableNames.CONTROLS,
+    TableNames.TESTS,
+    TableNames.REQUESTS,
+    "dashboard",
+}
 
 
 def serialize_value(v):
@@ -293,7 +297,9 @@ def format_requests_csv(rows):
 def build_export_response(table, rows):
     tmp = None
     try:
-        tmp = tempfile.NamedTemporaryFile(mode="w", newline="", delete=False, encoding="utf-8")
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", newline="", delete=False, encoding="utf-8"
+        )
         writer = csv.writer(tmp)
 
         if table == TableNames.CONTROLS:
@@ -311,6 +317,11 @@ def build_export_response(table, rows):
             writer.writerow(headers)
             for data in data_rows:
                 writer.writerow(data)
+        elif table == "dashboard":
+            headers, data_rows = format_dashboard_csv()
+            writer.writerow(headers)
+            for data in data_rows:
+                writer.writerow(data)
 
         tmp.flush()
         tmp.close()
@@ -322,6 +333,7 @@ def build_export_response(table, rows):
             TableNames.CONTROLS: "control_export.csv",
             TableNames.TESTS: "test_export.csv",
             TableNames.REQUESTS: "request_export.csv",
+            "dashboard": "dashboard_export.csv",
         }
         filename = FILENAME_MAP.get(table, f"{table}_export.csv")
         if not bucket:
@@ -367,12 +379,22 @@ def build_export_response(table, rows):
             Logger.log(
                 level=LogLevels.INFO,
                 message="Export uploaded to S3",
-                extra_fields={"table": table, "count": len(rows), "bucket": bucket, "key": object_key},
+                extra_fields={
+                    "table": table,
+                    "count": len(rows),
+                    "bucket": bucket,
+                    "key": object_key,
+                },
             )
 
             return ResponseUtils.http_response(
                 StatusCodes.OK,
-                {"download_url": download_url, "bucket": bucket, "key": object_key, "filename": filename},
+                {
+                    "download_url": download_url,
+                    "bucket": bucket,
+                    "key": object_key,
+                    "filename": filename,
+                },
             )
         except Exception as e:
             Logger.log(
@@ -390,6 +412,110 @@ def build_export_response(table, rows):
                 os.unlink(tmp.name)
         except Exception:
             pass
+
+
+def format_dashboard_csv():
+    tests = CrudUtils.get_all(TableNames.TESTS) or []
+    users = CrudUtils.get_all(TableNames.USERS) or []
+
+    total_tests = len(tests)
+
+    not_started = sum(
+        1 for r in tests if (r.get("status") or "").upper() == "NOT_STARTED"
+    )
+    completed = sum(1 for r in tests if (r.get("status") or "").upper() == "COMPLETED")
+    open_count = sum(
+        1
+        for r in tests
+        if (r.get("status") or "").upper() not in ("NOT_STARTED", "COMPLETED")
+    )
+    blocked = sum(
+        1
+        for r in tests
+        if (r.get("status") or "").upper() == "BLOCKED"
+        or (r.get("dat_step") or "").upper() == "TESTING_BLOCKED"
+        or (r.get("oet_step") or "").upper() == "TESTING_BLOCKED"
+    )
+
+    dat_only = sum(
+        1 for r in tests if r.get("requires_dat") and not r.get("requires_oet")
+    )
+    oet_only = sum(
+        1 for r in tests if r.get("requires_oet") and not r.get("requires_dat")
+    )
+    dat_and_oet = sum(
+        1 for r in tests if r.get("requires_oet") and r.get("requires_dat")
+    )
+
+    walkthrough_scheduled = sum(
+        1
+        for r in tests
+        if (r.get("dat_step") or "").upper() == "WALKTHROUGH_SCHEDULED"
+        or (r.get("oet_step") or "").upper() == "WALKTHROUGH_SCHEDULED"
+    )
+    walkthrough_completed = sum(
+        1
+        for r in tests
+        if (r.get("dat_step") or "").upper() == "WALKTHROUGH_COMPLETED"
+        or (r.get("oet_step") or "").upper() == "WALKTHROUGH_COMPLETED"
+    )
+
+    dat_in_progress = sum(
+        1
+        for r in tests
+        if (r.get("dat_step") or "").upper() == "TESTING_IN_PROGRESS"
+        or (r.get("status") or "").upper() == "DAT_IN_PROGRESS"
+    )
+    dat_completed = sum(
+        1 for r in tests if (r.get("dat_step") or "").upper() == "COMPLETED"
+    )
+
+    oet_in_progress = sum(
+        1
+        for r in tests
+        if (r.get("oet_step") or "").upper() == "TESTING_IN_PROGRESS"
+        or (r.get("status") or "").upper() == "OET_IN_PROGRESS"
+    )
+    oet_completed = sum(
+        1 for r in tests if (r.get("oet_step") or "").upper() == "COMPLETED"
+    )
+
+    rows = []
+    rows.append(["Total Controls", total_tests])
+    rows.append(["Not Started", not_started])
+    rows.append(["Open", open_count])
+    rows.append(["Completed", completed])
+    rows.append(["Blocked", blocked])
+    rows.append(["", ""])
+
+    rows.append(["DAT Only", dat_only])
+    rows.append(["OET Only", oet_only])
+    rows.append(["DAT & OET", dat_and_oet])
+    rows.append(["", ""])
+
+    rows.append(["Walkthrough Scheduled", walkthrough_scheduled])
+    rows.append(["Walkthrough Completed", walkthrough_completed])
+    rows.append(["DAT In Progress", dat_in_progress])
+    rows.append(["DAT Completed", dat_completed])
+    rows.append(["", ""])
+
+    rows.append(["OET In Progress", oet_in_progress])
+    rows.append(["OET Completed", oet_completed])
+    rows.append(["", ""])
+
+    # testers: NotCompleted/TotalAssigned
+    for u in users:
+        uid = u.get("user_id")
+        name = u.get("display_name") or u.get("email")
+        assigned = [t for t in tests if t.get("assigned_tester_id") == uid]
+        not_done = sum(
+            1 for t in assigned if (t.get("status") or "").upper() != "COMPLETED"
+        )
+        total_assigned = len(assigned)
+        rows.append([name, f"{not_done} | {total_assigned}"])
+
+    headers = ["Metric", "Value"]
+    return headers, rows
 
 
 def lambda_handler(event, context):

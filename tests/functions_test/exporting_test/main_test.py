@@ -3,6 +3,7 @@ from unittest import TestCase
 from unittest.mock import patch
 import functions.exporting.main as exporting
 import os
+import functools
 
 
 class TestExportingMain(TestCase):
@@ -25,6 +26,14 @@ class TestExportingMain(TestCase):
         if table == "users":
             return {"user_id": 30, "display_name": "Tester", "email": "t@example.com"}
         return None
+
+    @staticmethod
+    def make_get_all_side_effect(mapping):
+        return functools.partial(TestExportingMain.get_all_for_mapping, mapping)
+
+    @staticmethod
+    def get_all_for_mapping(mapping, table, order_by=None):
+        return mapping.get(table, [])
 
     def _build_event(self, method, path, body=None, path_params=None, query_params=None):
         event = {
@@ -103,14 +112,11 @@ class TestExportingMain(TestCase):
         request_row = {"request_id": 10, "created_by": 30, "description": "Req desc"}
         test_row = {"test_id": 1, "request_id": 10, "control_id": 20, "assigned_tester_id": 30}
 
-        def get_all_side_effect(table):
-            if table == exporting.TableNames.REQUESTS:
-                return [request_row]
-            if table == exporting.TableNames.TESTS:
-                return [test_row]
-            return []
-
-        mock_crud.get_all.side_effect = get_all_side_effect
+        mapping = {
+            exporting.TableNames.REQUESTS: [request_row],
+            exporting.TableNames.TESTS: [test_row],
+        }
+        mock_crud.get_all.side_effect = self.make_get_all_side_effect(mapping)
         mock_crud.get_by_id.side_effect = self.get_by_id_side_effect
         mock_client = mock_s3.get_client.return_value
         mock_client.upload_fileobj.return_value = None
@@ -208,3 +214,39 @@ class TestExportingMain(TestCase):
         self.assertNotIn("request_requestor", row)
         self.assertNotIn("control_vgcpid", row)
         self.assertNotIn("assigned_tester_name", row)
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    @patch('functions.exporting.main.S3Utils')
+    def test_dashboard_returns_expected_metrics(self, mock_s3, mock_crud, mock_logger):
+        # prepare sample tests and users
+        tests = [
+            {"test_id": 1, "status": "NOT_STARTED", "requires_dat": True, "requires_oet": False, "dat_step": None, "oet_step": None, "assigned_tester_id": 101},
+            {"test_id": 2, "status": "COMPLETED", "requires_dat": True, "requires_oet": True, "dat_step": "COMPLETED", "oet_step": "COMPLETED", "assigned_tester_id": 101},
+            {"test_id": 3, "status": "DAT_IN_PROGRESS", "requires_dat": True, "requires_oet": False, "dat_step": "TESTING_IN_PROGRESS", "oet_step": None, "assigned_tester_id": 102},
+            {"test_id": 4, "status": "BLOCKED", "requires_dat": False, "requires_oet": True, "dat_step": "TESTING_BLOCKED", "oet_step": "WALKTHROUGH_SCHEDULED", "assigned_tester_id": None},
+        ]
+
+        users = [
+            {"user_id": 101, "display_name": "Alice", "email": "alice@example.com"},
+            {"user_id": 102, "display_name": "Bob", "email": "bob@example.com"},
+        ]
+
+        mapping = {
+            exporting.TableNames.TESTS: tests,
+            exporting.TableNames.USERS: users,
+        }
+        mock_crud.get_all.side_effect = self.make_get_all_side_effect(mapping)
+
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download-dashboard"
+
+        event = self._build_event("GET", "/export", query_params={"table": "dashboard"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download-dashboard")
+        mock_client.upload_fileobj.assert_called()
