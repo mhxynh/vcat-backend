@@ -42,6 +42,7 @@ class TestRequestsMain(TestCase):
 		event = self._build_event("GET", "/requests")
 		result = requests.lambda_handler(event, None)
 
+		mock_crud.get_all.assert_called_once_with("requests", "request_id")
 		mock_logger.log.assert_any_call(level="INFO", message="Returning requests", extra_fields={"count": 2})
 		self.assertEqual(result["statusCode"], 200)
 		self.assertEqual(len(json.loads(result["body"])), 2)
