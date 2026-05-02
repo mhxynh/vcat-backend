@@ -46,11 +46,15 @@ class TestExportingMain(TestCase):
             event["body"] = json.dumps(body)
         return event
 
+    # Empty event
+
     @patch('functions.exporting.main.Logger')
     def test_empty_event_returns_400(self, mock_logger):
         result = exporting.lambda_handler({}, None)
         mock_logger.log.assert_any_call(level="ERROR", message="No event data provided")
         self.assertEqual(result["statusCode"], 400)
+
+    # GET /export
 
     @patch('functions.exporting.main.Logger')
     def test_missing_table_returns_400(self, mock_logger):
@@ -65,6 +69,44 @@ class TestExportingMain(TestCase):
         result = exporting.lambda_handler(event, None)
         mock_logger.log.assert_any_call(level="WARNING", message="Invalid table requested", extra_fields={"table": "bad"})
         self.assertEqual(result["statusCode"], 400)
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    @patch('functions.exporting.main.S3Utils')
+    def test_dashboard_returns_expected_metrics(self, mock_s3, mock_crud, mock_logger):
+        # prepare sample tests and users
+        tests = [
+            {"test_id": 1, "status": "NOT_STARTED", "requires_dat": True, "requires_oet": False, "dat_step": None, "oet_step": None, "assigned_tester_id": 101},
+            {"test_id": 2, "status": "COMPLETED", "requires_dat": True, "requires_oet": True, "dat_step": "COMPLETED", "oet_step": "COMPLETED", "assigned_tester_id": 101},
+            {"test_id": 3, "status": "DAT_IN_PROGRESS", "requires_dat": True, "requires_oet": False, "dat_step": "TESTING_IN_PROGRESS", "oet_step": None, "assigned_tester_id": 102},
+            {"test_id": 4, "status": "BLOCKED", "requires_dat": False, "requires_oet": True, "dat_step": "TESTING_BLOCKED", "oet_step": "WALKTHROUGH_SCHEDULED", "assigned_tester_id": None},
+        ]
+
+        users = [
+            {"user_id": 101, "display_name": "Alice", "email": "alice@example.com"},
+            {"user_id": 102, "display_name": "Bob", "email": "bob@example.com"},
+        ]
+
+        mapping = {
+            exporting.TableNames.TESTS: tests,
+            exporting.TableNames.USERS: users,
+        }
+        mock_crud.get_all.side_effect = self.make_get_all_side_effect(mapping)
+
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download-dashboard"
+
+        event = self._build_event("GET", "/export", query_params={"table": "dashboard"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download-dashboard")
+        mock_client.upload_fileobj.assert_called()
+
+    # GET /export - success cases
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
@@ -214,39 +256,3 @@ class TestExportingMain(TestCase):
         self.assertNotIn("request_requestor", row)
         self.assertNotIn("control_vgcpid", row)
         self.assertNotIn("assigned_tester_name", row)
-
-    @patch('functions.exporting.main.Logger')
-    @patch('functions.exporting.main.CrudUtils')
-    @patch('functions.exporting.main.S3Utils')
-    def test_dashboard_returns_expected_metrics(self, mock_s3, mock_crud, mock_logger):
-        # prepare sample tests and users
-        tests = [
-            {"test_id": 1, "status": "NOT_STARTED", "requires_dat": True, "requires_oet": False, "dat_step": None, "oet_step": None, "assigned_tester_id": 101},
-            {"test_id": 2, "status": "COMPLETED", "requires_dat": True, "requires_oet": True, "dat_step": "COMPLETED", "oet_step": "COMPLETED", "assigned_tester_id": 101},
-            {"test_id": 3, "status": "DAT_IN_PROGRESS", "requires_dat": True, "requires_oet": False, "dat_step": "TESTING_IN_PROGRESS", "oet_step": None, "assigned_tester_id": 102},
-            {"test_id": 4, "status": "BLOCKED", "requires_dat": False, "requires_oet": True, "dat_step": "TESTING_BLOCKED", "oet_step": "WALKTHROUGH_SCHEDULED", "assigned_tester_id": None},
-        ]
-
-        users = [
-            {"user_id": 101, "display_name": "Alice", "email": "alice@example.com"},
-            {"user_id": 102, "display_name": "Bob", "email": "bob@example.com"},
-        ]
-
-        mapping = {
-            exporting.TableNames.TESTS: tests,
-            exporting.TableNames.USERS: users,
-        }
-        mock_crud.get_all.side_effect = self.make_get_all_side_effect(mapping)
-
-        mock_client = mock_s3.get_client.return_value
-        mock_client.upload_fileobj.return_value = None
-        mock_client.generate_presigned_url.return_value = "https://example.com/download-dashboard"
-
-        event = self._build_event("GET", "/export", query_params={"table": "dashboard"})
-        result = exporting.lambda_handler(event, None)
-
-        self.assertEqual(result["statusCode"], 200)
-        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
-        self.assertIn("download_url", payload)
-        self.assertEqual(payload["download_url"], "https://example.com/download-dashboard")
-        mock_client.upload_fileobj.assert_called()

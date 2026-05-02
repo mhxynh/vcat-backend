@@ -302,26 +302,20 @@ def build_export_response(table, rows):
         )
         writer = csv.writer(tmp)
 
+        data_rows = []
         if table == TableNames.CONTROLS:
             headers, data_rows = format_controls_csv(rows)
-            writer.writerow(headers)
-            for data in data_rows:
-                writer.writerow(data)
         elif table == TableNames.TESTS:
             headers, data_rows = format_tests_csv(rows)
-            writer.writerow(headers)
-            for data in data_rows:
-                writer.writerow(data)
         elif table == TableNames.REQUESTS:
             headers, data_rows = format_requests_csv(rows)
-            writer.writerow(headers)
-            for data in data_rows:
-                writer.writerow(data)
         elif table == "dashboard":
             headers, data_rows = format_dashboard_csv()
-            writer.writerow(headers)
-            for data in data_rows:
-                writer.writerow(data)
+
+        # write CSV
+        writer.writerow(headers)
+        for data in data_rows:
+            writer.writerow(data)
 
         tmp.flush()
         tmp.close()
@@ -376,12 +370,13 @@ def build_export_response(table, rows):
                 ExpiresIn=presign_ttl,
             )
 
+            # log actual number of CSV data rows written for accuracy
             Logger.log(
                 level=LogLevels.INFO,
                 message="Export uploaded to S3",
                 extra_fields={
                     "table": table,
-                    "count": len(rows),
+                    "count": len(data_rows),
                     "bucket": bucket,
                     "key": object_key,
                 },
@@ -504,10 +499,15 @@ def format_dashboard_csv():
     rows.append(["", ""])
 
     # testers: NotCompleted/TotalAssigned
+    tests_by_tester = {}
+    for t in tests:
+        tester_id = t.get("assigned_tester_id")
+        tests_by_tester.setdefault(tester_id, []).append(t)
+
     for u in users:
         uid = u.get("user_id")
         name = u.get("display_name") or u.get("email")
-        assigned = [t for t in tests if t.get("assigned_tester_id") == uid]
+        assigned = tests_by_tester.get(uid, [])
         not_done = sum(
             1 for t in assigned if (t.get("status") or "").upper() != "COMPLETED"
         )
