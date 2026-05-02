@@ -32,7 +32,7 @@ def lambda_handler(event, context):
 
         # GET /requests : list all requests
         if method == Methods.GET and normalized_path == "/requests":
-            requests = CrudUtils.get_all(TableNames.REQUESTS)
+            requests = CrudUtils.get_all(TableNames.REQUESTS, "request_id")
             Logger.log(
                 level=LogLevels.INFO,
                 message="Returning requests",
