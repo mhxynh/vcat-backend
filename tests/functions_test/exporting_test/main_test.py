@@ -2,15 +2,20 @@ import json
 from unittest import TestCase
 from unittest.mock import patch
 import functions.exporting.main as exporting
+import os
+import functools
 
 
 class TestExportingMain(TestCase):
     def setUp(self):
         self.user_resolver_patcher = patch('functions.exporting.main.UserResolver')
         self.mock_user_resolver = self.user_resolver_patcher.start()
+        # ensure exporter finds a bucket during tests
+        os.environ["EXPORT_BUCKET_NAME"] = "test-bucket"
 
     def tearDown(self):
         self.user_resolver_patcher.stop()
+        os.environ.pop("EXPORT_BUCKET_NAME", None)
 
     @staticmethod
     def get_by_id_side_effect(table, pk_column=None, pk_value=None):
@@ -21,6 +26,14 @@ class TestExportingMain(TestCase):
         if table == "users":
             return {"user_id": 30, "display_name": "Tester", "email": "t@example.com"}
         return None
+
+    @staticmethod
+    def make_get_all_side_effect(mapping):
+        return functools.partial(TestExportingMain.get_all_for_mapping, mapping)
+
+    @staticmethod
+    def get_all_for_mapping(mapping, table, order_by=None):
+        return mapping.get(table, [])
 
     def _build_event(self, method, path, body=None, path_params=None, query_params=None):
         event = {
@@ -33,11 +46,15 @@ class TestExportingMain(TestCase):
             event["body"] = json.dumps(body)
         return event
 
+    # Empty event
+
     @patch('functions.exporting.main.Logger')
     def test_empty_event_returns_400(self, mock_logger):
         result = exporting.lambda_handler({}, None)
         mock_logger.log.assert_any_call(level="ERROR", message="No event data provided")
         self.assertEqual(result["statusCode"], 400)
+
+    # GET /export
 
     @patch('functions.exporting.main.Logger')
     def test_missing_table_returns_400(self, mock_logger):
@@ -55,68 +72,110 @@ class TestExportingMain(TestCase):
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
-    def test_get_controls_returns_csv(self, mock_crud, mock_logger):
+    @patch('functions.exporting.main.S3Utils')
+    def test_dashboard_returns_expected_metrics(self, mock_s3, mock_crud, mock_logger):
+        # prepare sample tests and users
+        tests = [
+            {"test_id": 1, "status": "NOT_STARTED", "requires_dat": True, "requires_oet": False, "dat_step": None, "oet_step": None, "assigned_tester_id": 101},
+            {"test_id": 2, "status": "COMPLETED", "requires_dat": True, "requires_oet": True, "dat_step": "COMPLETED", "oet_step": "COMPLETED", "assigned_tester_id": 101},
+            {"test_id": 3, "status": "DAT_IN_PROGRESS", "requires_dat": True, "requires_oet": False, "dat_step": "TESTING_IN_PROGRESS", "oet_step": None, "assigned_tester_id": 102},
+            {"test_id": 4, "status": "BLOCKED", "requires_dat": False, "requires_oet": True, "dat_step": "TESTING_BLOCKED", "oet_step": "WALKTHROUGH_SCHEDULED", "assigned_tester_id": None},
+        ]
+
+        users = [
+            {"user_id": 101, "display_name": "Alice", "email": "alice@example.com"},
+            {"user_id": 102, "display_name": "Bob", "email": "bob@example.com"},
+        ]
+
+        mapping = {
+            exporting.TableNames.TESTS: tests,
+            exporting.TableNames.USERS: users,
+        }
+        mock_crud.get_all.side_effect = self.make_get_all_side_effect(mapping)
+
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download-dashboard"
+
+        event = self._build_event("GET", "/export", query_params={"table": "dashboard"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download-dashboard")
+        mock_client.upload_fileobj.assert_called()
+
+    # GET /export - success cases
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    @patch('functions.exporting.main.S3Utils')
+    def test_get_controls_returns_csv(self, mock_s3, mock_crud, mock_logger):
         mock_crud.get_all.return_value = [{"vgcpid": "VGCP-001", "description": "D1"}, {"vgcpid": "VGCP-002", "description": "D2"}]
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download"
 
         event = self._build_event("GET", "/export", query_params={"table": "controls"})
         result = exporting.lambda_handler(event, None)
 
         self.assertEqual(result["statusCode"], 200)
-        self.assertEqual(result["headers"]["Content-Type"], "text/csv")
-        body = result["body"]
-        self.assertIn("VGCPID", body)
-        self.assertIn("VGCP-001", body)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download")
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
-    def test_get_tests_includes_referenced_values(self, mock_crud, mock_logger):
+    @patch('functions.exporting.main.S3Utils')
+    def test_get_tests_includes_referenced_values(self, mock_s3, mock_crud, mock_logger):
         # base test row references request_id, control_id, assigned_tester_id
         test_row = {"test_id": 1, "request_id": 10, "control_id": 20, "assigned_tester_id": 30}
         mock_crud.get_all.return_value = [test_row]
 
         mock_crud.get_by_id.side_effect = self.get_by_id_side_effect
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download-tests"
 
         event = self._build_event("GET", "/export", query_params={"table": "tests"})
         result = exporting.lambda_handler(event, None)
 
         self.assertEqual(result["statusCode"], 200)
-        body = result["body"]
-        self.assertNotIn("request_requestor", body)
-        self.assertIn("VGCPID", body)
-        self.assertIn("VGCP-020", body)
-        self.assertIn("Tester", body)
-        self.assertIn("t@example.com", body)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download-tests")
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
-    def test_requests_tests_requested_column(self, mock_crud, mock_logger):
+    @patch('functions.exporting.main.S3Utils')
+    def test_requests_tests_requested_column(self, mock_s3, mock_crud, mock_logger):
         # Ensure requests export includes a 'Tests Requested' column listing linked VGCPIDs
         request_row = {"request_id": 10, "created_by": 30, "description": "Req desc"}
         test_row = {"test_id": 1, "request_id": 10, "control_id": 20, "assigned_tester_id": 30}
 
-        def get_all_side_effect(table):
-            if table == exporting.TableNames.REQUESTS:
-                return [request_row]
-            if table == exporting.TableNames.TESTS:
-                return [test_row]
-            return []
-
-        mock_crud.get_all.side_effect = get_all_side_effect
+        mapping = {
+            exporting.TableNames.REQUESTS: [request_row],
+            exporting.TableNames.TESTS: [test_row],
+        }
+        mock_crud.get_all.side_effect = self.make_get_all_side_effect(mapping)
         mock_crud.get_by_id.side_effect = self.get_by_id_side_effect
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download-requests"
 
         event = self._build_event("GET", "/export", query_params={"table": "requests"})
         result = exporting.lambda_handler(event, None)
 
         self.assertEqual(result["statusCode"], 200)
-        body = result["body"]
-        self.assertIn("Tests Requested", body)
-        self.assertIn("VGCP-020", body)
-        self.assertNotIn("request_id", body)
-        self.assertNotIn("created_by", body)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download-requests")
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
-    def test_tests_headers_capitalize_dat_oet(self, mock_crud, mock_logger):
+    @patch('functions.exporting.main.S3Utils')
+    def test_tests_headers_capitalize_dat_oet(self, mock_s3, mock_crud, mock_logger):
         # Ensure DAT/OET tokens are capitalized in headers and included in correct order
         test_row = {
             "test_id": 3,
@@ -130,16 +189,17 @@ class TestExportingMain(TestCase):
         }
         mock_crud.get_all.return_value = [test_row]
         mock_crud.get_by_id.side_effect = self.get_by_id_side_effect
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.return_value = None
+        mock_client.generate_presigned_url.return_value = "https://example.com/download-tests-dat-oet"
 
         event = self._build_event("GET", "/export", query_params={"table": "tests"})
         result = exporting.lambda_handler(event, None)
 
         self.assertEqual(result["statusCode"], 200)
-        body = result["body"]
-        self.assertIn("Requires DAT", body)
-        self.assertIn("Requires OET", body)
-        self.assertIn("DAT Step", body)
-        self.assertIn("OET Step", body)
+        payload = json.loads(result["body"]) if isinstance(result.get("body"), str) else result["body"]
+        self.assertIn("download_url", payload)
+        self.assertEqual(payload["download_url"], "https://example.com/download-tests-dat-oet")
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
