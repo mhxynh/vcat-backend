@@ -7,6 +7,13 @@ from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
 
 
+def _optional_request_id(body):
+    request_id = body.get("request_id")
+    if request_id == "":
+        return None
+    return request_id
+
+
 def lambda_handler(event, context):
     if event and event.get("httpMethod") == "OPTIONS":
         return ResponseUtils.cors_preflight()
@@ -71,7 +78,7 @@ def lambda_handler(event, context):
             body = json.loads(event.get("body", "{}"))
             required = [
                 "vgcpid",
-                "request_id",
+              # "request_id",
                 "requires_dat",
                 "requires_oet",
                 "due_date",
@@ -87,7 +94,7 @@ def lambda_handler(event, context):
 
             created = TestRepository.create(
                 vgcpid=body["vgcpid"],
-                request_id=body["request_id"],
+                request_id=_optional_request_id(body),
                 description=body["description"],
                 requires_dat=body["requires_dat"],
                 requires_oet=body["requires_oet"],
@@ -168,7 +175,7 @@ def lambda_handler(event, context):
                 updated_record = TestRepository.update_details(
                     test_id,
                     body.get("vgcpid"),
-                    body.get("request_id"),
+                    _optional_request_id(body),
                     body.get("assigned_tester_id"),
                     body.get("requires_dat"),
                     body.get("requires_oet"),
