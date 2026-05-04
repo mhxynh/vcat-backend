@@ -78,7 +78,6 @@ def lambda_handler(event, context):
             body = json.loads(event.get("body", "{}"))
             required = [
                 "vgcpid",
-                # "request_id",
                 "requires_dat",
                 "requires_oet",
                 "due_date",
