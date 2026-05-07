@@ -25,7 +25,7 @@ def serialize_value(v):
     if isinstance(v, bool):
         return "Yes" if v else "No"
     if isinstance(v, (list, tuple)):
-        return ";".join([str(x) for x in v])
+        return ";".join([serialize_value(x) for x in v])
     if v is None:
         return ""
     return str(v)
@@ -194,6 +194,8 @@ def format_controls_csv(rows):
         "Date Created",
         "Last Tested",
     ]
+    if not rows:
+        return ["VGCPID", "Description"], []
     data = []
     for row in rows:
         data.append(
@@ -268,7 +270,7 @@ def format_requests_csv(rows):
     headers = ["Tests Requested"]
     data = []
     if not rows:
-        return headers, data
+        return ["Request ID", "Created By Name", "Created By Email"], []
 
     excluded = {"request_id", "created_by"}
 
