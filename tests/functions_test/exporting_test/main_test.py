@@ -4,7 +4,6 @@ from unittest.mock import patch
 import functions.exporting.main as exporting
 import os
 import functools
-from datetime import datetime
 
 
 class TestExportingMain(TestCase):
@@ -410,7 +409,7 @@ class TestExportingMain(TestCase):
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
     @patch('functions.exporting.main.S3Utils')
-    def test_buiild_export_upload_to_s3_exception_returns_500(self, mock_s3, mock_crud, mock_logger):
+    def test_build_export_upload_to_s3_exception_returns_500(self, mock_s3, mock_crud, mock_logger):
         mock_crud.get_all.return_value = []
         mock_client = mock_s3.get_client.return_value
         mock_client.upload_fileobj.side_effect = Exception("S3 upload failed")
