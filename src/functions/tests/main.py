@@ -6,6 +6,26 @@ from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
 
+TEST_ALREADY_EXISTS_FOR_REQUEST_MESSAGE = (
+    "This request already has a control test for that VGCPID. "
+    "Choose a different control or update the existing test."
+)
+
+
+def _is_duplicate_request_control_test_error(error):
+    constraint_name = getattr(getattr(error, "diag", None), "constraint_name", None)
+    error_message = str(error).lower()
+
+    return (
+        constraint_name == "tests_unique_per_request_control_track"
+        or "tests_unique_per_request_control_track" in error_message
+        or (
+            "duplicate key value violates unique constraint" in error_message
+            and "request_id" in error_message
+            and "control_id" in error_message
+        )
+    )
+
 
 def lambda_handler(event, context):
     if event and event.get("httpMethod") == "OPTIONS":
@@ -284,6 +304,17 @@ def lambda_handler(event, context):
 
     except Exception as e:
         error_message = str(e)
+        if _is_duplicate_request_control_test_error(e):
+            Logger.log(
+                level=LogLevels.WARNING,
+                message="Duplicate control test for request",
+                extra_fields={"exception": error_message},
+            )
+            return ResponseUtils.http_response(
+                StatusCodes.CONFLICT,
+                {"error": TEST_ALREADY_EXISTS_FOR_REQUEST_MESSAGE},
+            )
+
         # Catch missing vgcpid (Subquery returns NULL)
         if (
             "violates not-null constraint" in error_message

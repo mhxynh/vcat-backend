@@ -235,6 +235,30 @@ class TestControlsMain(TestCase):
 
     @patch('functions.controls.main.Logger')
     @patch('functions.controls.main.CrudUtils')
+    def test_delete_control_hard_delete_linked_to_test_returns_friendly_409(self, mock_crud, mock_logger):
+        constraint_error = Exception(
+            'update or delete on table "controls" violates foreign key constraint '
+            '"tests_control_id_fkey" on table "tests"'
+        )
+        mock_crud.hard_delete.side_effect = constraint_error
+
+        event = self._build_event("DELETE", "/controls/VGCP-001", path_params={"vgcpid": "VGCP-001"}, query_params={"hard": "true"})
+        result = controls.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 409)
+        self.assertEqual(
+            json.loads(result["body"])["error"],
+            "This control cannot be permanently deleted because it is linked to one or "
+            "more active control tests.",
+        )
+        mock_logger.log.assert_any_call(
+            level="WARNING",
+            message="Cannot delete control linked to tests",
+            extra_fields={"exception": str(constraint_error)},
+        )
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.CrudUtils')
     def test_delete_control_missing_vgcpid_returns_400(self, mock_crud, mock_logger):
         event = self._build_event("DELETE", "/controls/", path_params={})
         result = controls.lambda_handler(event, None)

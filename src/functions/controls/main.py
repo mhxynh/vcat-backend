@@ -8,6 +8,10 @@ from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
 
 VGCPID_UNIQUE_CONSTRAINT = "controls_vgcpid_key"
+CONTROL_IN_TEST_MESSAGE = (
+    "This control cannot be permanently deleted because it is linked to one or "
+    "more active control tests."
+)
 
 
 def _duplicate_vgcpid_message(error):
@@ -28,6 +32,21 @@ def _duplicate_vgcpid_message(error):
 
     control_id = re.sub(r"^VGCP-", "", match.group(1), flags=re.IGNORECASE)
     return f"Control ID {control_id} already exists, please choose another ID."
+
+
+def _is_control_in_test_error(error):
+    constraint_name = getattr(getattr(error, "diag", None), "constraint_name", None)
+    error_text = str(error).lower()
+
+    return (
+        constraint_name == "tests_control_id_fkey"
+        or "tests_control_id_fkey" in error_text
+        or (
+            "violates foreign key constraint" in error_text
+            and "tests" in error_text
+            and "control_id" in error_text
+        )
+    )
 
 
 def lambda_handler(event, context):
@@ -302,6 +321,16 @@ def lambda_handler(event, context):
             )
             return ResponseUtils.http_response(
                 StatusCodes.CONFLICT, {"error": duplicate_message}
+            )
+
+        if _is_control_in_test_error(e):
+            Logger.log(
+                level=LogLevels.WARNING,
+                message="Cannot delete control linked to tests",
+                extra_fields={"exception": str(e)},
+            )
+            return ResponseUtils.http_response(
+                StatusCodes.CONFLICT, {"error": CONTROL_IN_TEST_MESSAGE}
             )
 
         Logger.log(
