@@ -31,6 +31,48 @@ class TestControlsMain(TestCase):
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("No event data", json.loads(result["body"])["error"])
 
+    # Authorization
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.AuthUtils.is_tester', return_value=False)
+    def test_post_method_without_tester_access(self, mock_is_tester, mock_logger):
+        event = self._build_event("POST", "/controls", body={"vgcpid": "VGCP-999", "description": "New", "control_owner": "Owner", "escalation": True})
+        result = controls.lambda_handler(event, None)
+
+        mock_is_tester.assert_called_once_with(event)
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.AuthUtils.is_manager', return_value=False)
+    def test_post_method_without_manager_access(self, mock_is_manager, mock_logger):
+        event = self._build_event("POST", "/controls", body={"vgcpid": "VGCP-999", "description": "New", "control_owner": "Owner", "escalation": True})
+        result = controls.lambda_handler(event, None)
+
+        mock_is_manager.assert_called_once_with(event)
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.AuthUtils.is_manager', return_value=False)
+    def test_put_method_without_manager_access(self, mock_is_manager, mock_logger):
+        event = self._build_event("PUT", "/controls/VGCP-001", body={"description": "Updated"}, path_params={"vgcpid": "VGCP-001"})
+        result = controls.lambda_handler(event, None)
+
+        mock_is_manager.assert_called_once_with(event)
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
+    @patch('functions.controls.main.Logger')
+    @patch('functions.controls.main.AuthUtils.is_manager', return_value=False)
+    def test_delete_method_without_manager_access(self, mock_is_manager, mock_logger):
+        event = self._build_event("DELETE", "/controls/VGCP-001", path_params={"vgcpid": "VGCP-001"})
+        result = controls.lambda_handler(event, None)
+
+        mock_is_manager.assert_called_once_with(event)
+        self.assertEqual(result["statusCode"], 403)
+        self.assertIn("Forbidden", json.loads(result["body"])["error"])
+
     # GET /controls
 
     @patch('functions.controls.main.Logger')
