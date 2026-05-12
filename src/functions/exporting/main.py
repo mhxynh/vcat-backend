@@ -195,7 +195,7 @@ def format_controls_csv(rows):
         "Last Tested",
     ]
     if not rows:
-        return ["VGCPID", "Description"], []
+        return headers, []
     data = []
     for row in rows:
         data.append(
@@ -270,7 +270,7 @@ def format_requests_csv(rows):
     headers = ["Tests Requested"]
     data = []
     if not rows:
-        return ["Request ID", "Created By Name", "Created By Email"], []
+        return headers, data
 
     excluded = {"request_id", "created_by"}
 

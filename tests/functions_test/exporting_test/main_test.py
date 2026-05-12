@@ -384,11 +384,11 @@ class TestExportingMain(TestCase):
 
     def test_empty_rows_format_controls_csv(self):
         csv = exporting.format_controls_csv([])
-        self.assertEqual(csv, (['VGCPID', 'Description'], []))
+        self.assertEqual(csv, (['VGCPID', 'Description', 'Control Owner', 'Control SME', 'Escalation Required?', 'Is Active?', 'Date Created', 'Last Tested'], []))
 
     def test_empty_rows_format_requests_csv(self):
         csv = exporting.format_requests_csv([])
-        self.assertEqual(csv, (['Request ID', 'Created By Name', 'Created By Email'], []))
+        self.assertEqual(csv, (['Tests Requested'], []))
 
     # build_export_response
 
