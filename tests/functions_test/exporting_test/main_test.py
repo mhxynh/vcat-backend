@@ -35,6 +35,38 @@ class TestExportingMain(TestCase):
     def get_all_for_mapping(mapping, table, order_by=None):
         return mapping.get(table, [])
 
+    @staticmethod
+    def get_all_tests_with_row_factory(row):
+        def _side_effect(table, order_by=None):
+            if table == exporting.TableNames.TESTS:
+                return [row]
+            return []
+
+        return _side_effect
+
+    @staticmethod
+    def get_all_side_effect_for_tests_requests(tests, requests):
+        def _side_effect(table, order_by=None):
+            if table == exporting.TableNames.TESTS:
+                return tests
+            if table == exporting.TableNames.REQUESTS:
+                return requests
+            return []
+
+        return _side_effect
+
+    @staticmethod
+    def get_by_id_raise_on_controls(table, pk_col=None, pk_val=None):
+        if table == exporting.TableNames.CONTROLS:
+            raise Exception("DB failure fetching control")
+        return None
+
+    @staticmethod
+    def get_by_id_raise_on_users(table, pk_col=None, pk_val=None):
+        if table == exporting.TableNames.USERS:
+            raise Exception("DB failure fetching user")
+        return None
+
     def _build_event(self, method, path, body=None, path_params=None, query_params=None):
         event = {
             "httpMethod": method,
@@ -106,7 +138,7 @@ class TestExportingMain(TestCase):
         self.assertEqual(payload["download_url"], "https://example.com/download-dashboard")
         mock_client.upload_fileobj.assert_called()
 
-    # GET /export - success cases
+    # GET /export
 
     @patch('functions.exporting.main.Logger')
     @patch('functions.exporting.main.CrudUtils')
@@ -212,6 +244,15 @@ class TestExportingMain(TestCase):
         self.assertEqual(result["statusCode"], 500)
         self.assertIn("DB error", json.loads(result["body"])["error"])
 
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    def test_invalid_method_returns_405(self, mock_crud, mock_logger):
+        event = self._build_event("POST", "/export", query_params={"table": "controls"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 405)
+        mock_logger.log.assert_any_call(level="WARNING", message="Method not allowed", extra_fields={"method": "POST", "path": "/export"})
+
     # fetch_rows tests
 
     @patch('functions.exporting.main.Logger')
@@ -256,3 +297,146 @@ class TestExportingMain(TestCase):
         self.assertNotIn("request_requestor", row)
         self.assertNotIn("control_vgcpid", row)
         self.assertNotIn("assigned_tester_name", row)
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    def test_fetch_rows_handles_tester_lookup_exception(self, mock_crud, mock_logger):
+        # Simulate a test row that references a tester; prefetch returns no users
+        test_row = {"test_id": 1, "request_id": 10, "control_id": None, "assigned_tester_id": 30}
+
+        mock_crud.get_all.side_effect = self.get_all_tests_with_row_factory(test_row)
+        mock_crud.get_by_id.side_effect = self.get_by_id_raise_on_users
+
+        rows = exporting.fetch_rows(exporting.TableNames.TESTS)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        # since the user lookup raised, enrichment keys should not be present
+        self.assertNotIn("assigned_tester_name", row)
+        self.assertNotIn("assigned_tester_email", row)
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    def test_fetch_rows_requests_control_lookup_exception(self, mock_crud, mock_logger):
+        # tests include a mapping to a control; controls prefetch empty
+        tests = [{"test_id": 1, "request_id": 10, "control_id": 20}]
+        requests = [{"request_id": 10, "created_by": None}]
+
+        mock_crud.get_all.side_effect = self.get_all_side_effect_for_tests_requests(tests, requests)
+        mock_crud.get_by_id.side_effect = self.get_by_id_raise_on_controls
+
+        rows = exporting.fetch_rows(exporting.TableNames.REQUESTS)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        # mapping failed, so tests_requested should be empty
+        self.assertEqual(row.get("tests_requested"), [])
+
+        # ensure the logger recorded the mapping failure
+        logged_messages = [c.kwargs.get("message") for c in mock_logger.log.call_args_list]
+        self.assertTrue(any(m == "Failed to fetch control for tests mapping" for m in logged_messages))
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    def test_fetch_rows_requests_user_lookup_exception(self, mock_crud, mock_logger):
+        # requests include a created_by that will fail to fetch
+        requests = [{"request_id": 11, "created_by": 30}]
+
+        mock_crud.get_all.side_effect = self.get_all_side_effect_for_tests_requests([], requests)
+        mock_crud.get_by_id.side_effect = self.get_by_id_raise_on_users
+
+        rows = exporting.fetch_rows(exporting.TableNames.REQUESTS)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        # user enrichment should be absent when fetching user failed
+        self.assertNotIn("created_by_name", row)
+        self.assertNotIn("created_by_email", row)
+
+        logged_messages = [c.kwargs.get("message") for c in mock_logger.log.call_args_list]
+        self.assertTrue(any(m == "Failed to fetch user for request" for m in logged_messages))
+
+    # serialize_value
+
+    def test_serialize_value_none(self):
+        self.assertEqual(exporting.serialize_value(None), "")
+
+    def test_serialize_value_datetime(self):
+        from datetime import datetime
+        dt = datetime(2024, 1, 1, 12, 0, 0)
+        self.assertEqual(exporting.serialize_value(dt), "2024-01-01T12:00:00")
+
+    def test_serialize_value_string(self):
+        self.assertEqual(exporting.serialize_value("test"), "test")
+
+    def test_serialize_value_number(self):
+        self.assertEqual(exporting.serialize_value(123), "123")
+
+    def test_serialize_value_boolean(self):
+        self.assertEqual(exporting.serialize_value(True), "Yes")
+        self.assertEqual(exporting.serialize_value(False), "No")
+
+    def test_serialize_value_list(self):
+        self.assertEqual(exporting.serialize_value([1, "two", None]), "1;two;")
+        
+    # empty rows formatting
+
+    def test_empty_rows_format_tests_csv(self):
+        csv = exporting.format_tests_csv([])
+        self.assertEqual(csv, (['VGCPID', 'Assigned Tester Name', 'Assigned Tester Email'], []))
+
+    def test_empty_rows_format_controls_csv(self):
+        csv = exporting.format_controls_csv([])
+        self.assertEqual(csv, (['VGCPID', 'Description', 'Control Owner', 'Control SME', 'Escalation Required?', 'Is Active?', 'Date Created', 'Last Tested'], []))
+
+    def test_empty_rows_format_requests_csv(self):
+        csv = exporting.format_requests_csv([])
+        self.assertEqual(csv, (['Tests Requested'], []))
+
+    # build_export_response
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    @patch('functions.exporting.main.S3Utils')
+    def test_build_export_no_bucket_returns_500(self, mock_s3, mock_crud, mock_logger):
+        os.environ.pop("EXPORT_BUCKET_NAME", None)
+
+        mock_crud.get_all.return_value = []
+
+        event = self._build_event("GET", "/export", query_params={"table": "controls"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 500)
+        mock_logger.log.assert_any_call(level="ERROR", message="Export bucket not configured", extra_fields={"table": "controls"})
+
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    @patch('functions.exporting.main.S3Utils')
+    def test_build_export_upload_to_s3_exception_returns_500(self, mock_s3, mock_crud, mock_logger):
+        mock_crud.get_all.return_value = []
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.side_effect = Exception("S3 upload failed")
+
+        event = self._build_event("GET", "/export", query_params={"table": "controls"})
+        result = exporting.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 500)
+        self.assertIn("Failed to upload export to S3", json.loads(result["body"])["error"])
+
+    @patch('functions.exporting.main.os.unlink', side_effect=Exception('unlink fail'))
+    @patch('functions.exporting.main.Logger')
+    @patch('functions.exporting.main.CrudUtils')
+    @patch('functions.exporting.main.S3Utils')
+    def test_build_export_handles_unlink_exception(self, mock_s3, mock_crud, mock_logger, mock_unlink):
+        # Ensure bucket is configured
+        os.environ["EXPORT_BUCKET_NAME"] = "test-bucket"
+
+        # No rows to write but upload will fail to force the except -> finally path
+        mock_crud.get_all.return_value = []
+        mock_client = mock_s3.get_client.return_value
+        mock_client.upload_fileobj.side_effect = Exception("S3 upload failed")
+
+        event = self._build_event("GET", "/export", query_params={"table": "controls"})
+        result = exporting.lambda_handler(event, None)
+
+        # Handler should return 500 and not raise despite unlink raising in finally
+        self.assertEqual(result["statusCode"], 500)
+        self.assertIn("Failed to upload export to S3", json.loads(result["body"])["error"])
+        mock_unlink.assert_called()
