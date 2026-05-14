@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date, datetime
+from datetime import date
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
