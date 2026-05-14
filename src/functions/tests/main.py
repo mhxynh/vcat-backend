@@ -1,15 +1,16 @@
 import json
-from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
+from constants.common_variables import (
+    LogLevels,
+    Methods,
+    StatusCodes,
+    TableNames,
+    TEST_ALREADY_EXISTS_FOR_REQUEST_MESSAGE,
+)
 from functions.tests.test_repository import TestRepository
 from utils.logger import Logger
 from utils.response import ResponseUtils
 from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
-
-TEST_ALREADY_EXISTS_FOR_REQUEST_MESSAGE = (
-    "This request already has a control test for that VGCPID. "
-    "Choose a different control or update the existing test."
-)
 
 
 def _is_duplicate_request_control_test_error(error):

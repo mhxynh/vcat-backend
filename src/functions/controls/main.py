@@ -1,6 +1,12 @@
 import json
 import re
-from constants.common_variables import LogLevels, Methods, StatusCodes, TableNames
+from constants.common_variables import (
+    CONTROL_IN_TEST_MESSAGE,
+    LogLevels,
+    Methods,
+    StatusCodes,
+    TableNames,
+)
 from utils.crud import CrudUtils
 from utils.logger import Logger
 from utils.response import ResponseUtils
@@ -8,10 +14,6 @@ from utils.auth_utils import AuthUtils
 from utils.user_resolver import UserResolver
 
 VGCPID_UNIQUE_CONSTRAINT = "controls_vgcpid_key"
-CONTROL_IN_TEST_MESSAGE = (
-    "This control cannot be permanently deleted because it is linked to one or "
-    "more active control tests."
-)
 
 
 def _duplicate_vgcpid_message(error):
@@ -330,7 +332,8 @@ def lambda_handler(event, context):
                 extra_fields={"exception": str(e)},
             )
             return ResponseUtils.http_response(
-                StatusCodes.CONFLICT, {"error": CONTROL_IN_TEST_MESSAGE}
+                StatusCodes.UNPROCESSABLE_ENTITY,
+                {"error": CONTROL_IN_TEST_MESSAGE},
             )
 
         Logger.log(

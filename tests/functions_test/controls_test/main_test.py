@@ -287,11 +287,11 @@ class TestControlsMain(TestCase):
         event = self._build_event("DELETE", "/controls/VGCP-001", path_params={"vgcpid": "VGCP-001"}, query_params={"hard": "true"})
         result = controls.lambda_handler(event, None)
 
-        self.assertEqual(result["statusCode"], 409)
+        self.assertEqual(result["statusCode"], 422)
         self.assertEqual(
             json.loads(result["body"])["error"],
-            "This control cannot be permanently deleted because it is linked to one or "
-            "more active control tests.",
+            "This control cannot be deleted because it is part of one or more active tests. "
+            "Please remove it from all active tests before trying again.",
         )
         mock_logger.log.assert_any_call(
             level="WARNING",

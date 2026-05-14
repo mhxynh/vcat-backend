@@ -497,7 +497,7 @@ class TestTestsMain(TestCase):
 
     @patch("functions.tests.main.Logger")
     @patch("functions.tests.main.TestRepository")
-    def test_exception_duplicate_request_control_test_returns_409(
+    def test_exception_duplicate_request_control_test_returns_422(
         self, mock_repo, mock_logger
     ):
         duplicate_error = Exception(
@@ -524,7 +524,8 @@ class TestTestsMain(TestCase):
         self.assertEqual(result["statusCode"], 409)
         self.assertEqual(
             json.loads(result["body"])["error"],
-            tests_main.TEST_ALREADY_EXISTS_FOR_REQUEST_MESSAGE,
+            "This request already has a control test for that control. "
+            "Choose a different control or update the existing test.",
         )
         mock_logger.log.assert_any_call(
             level="WARNING",
