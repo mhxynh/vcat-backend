@@ -77,3 +77,14 @@ class S3Utils:
             },
             ExpiresIn=expires_in,
         )
+
+    @staticmethod
+    def generate_presigned_get_url(bucket_name, object_key, expires_in):
+        return S3Utils.get_client().generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": bucket_name,
+                "Key": object_key,
+            },
+            ExpiresIn=expires_in,
+        )
