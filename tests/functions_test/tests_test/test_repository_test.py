@@ -138,6 +138,24 @@ class TestTestRepository(TestCase):
         mock_conn.commit.assert_called_once()
         self.assertEqual(result["test_id"], 1)
         self.assertEqual(result["assigned_tester_name"], "Alice")   
+
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_create_allows_null_request_id(self, mock_db):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 1, "request_id": None}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+
+        result = TestRepository.create(
+            vgcpid="VGCP-001", request_id=None, description="Desc",
+            requires_dat=True, requires_oet=False, due_date="2026-03-01"
+        )
+
+        args, kwargs = mock_cursor.execute.call_args
+        sql_params = args[1]
+
+        self.assertIsNone(sql_params[1])
+        mock_conn.commit.assert_called_once()
+        self.assertIsNone(result["request_id"])
+
     @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
     def test_create_error(self, mock_db, mock_logger):
