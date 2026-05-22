@@ -506,6 +506,9 @@ def format_dashboard_csv():
         tester_id = t.get("assigned_tester_id")
         tests_by_tester.setdefault(tester_id, []).append(t)
 
+    # add a label row to explain the tester value format
+    rows.append(["Tester", "In Progress | Total Assigned"])
+
     for u in users:
         uid = u.get("user_id")
         name = u.get("display_name") or u.get("email")
