@@ -30,6 +30,17 @@ class TestUsersMain(TestCase):
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("No event data", json.loads(result["body"])["error"])
 
+    @patch('functions.users.main.Logger')
+    @patch('functions.users.main.ResponseUtils')
+    def test_options_returns_cors(self, mock_responseutils, mock_logger):
+        mock_responseutils.cors_preflight.return_value = {"statusCode": 200, "headers": {"cors": True}, "body": ""}
+
+        event = self._build_event("OPTIONS", "/users")
+        result = users.lambda_handler(event, None)
+
+        self.assertEqual(result, {"statusCode": 200, "headers": {"cors": True}, "body": ""})
+        mock_responseutils.cors_preflight.assert_called_once()
+
     # GET /users
 
     @patch('functions.users.main.Logger')

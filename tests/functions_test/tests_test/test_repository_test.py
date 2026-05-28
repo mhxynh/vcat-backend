@@ -722,22 +722,18 @@ class TestTestRepository(TestCase):
         mock_audit.audit_update.assert_called_once()
         self.assertEqual(result["status"], "IN_REVIEW")
 
+    def test_normalize_evidence_links_none_returns_none(self):
+        self.assertIsNone(TestRepository._normalize_evidence_links(None))
 
-def test_normalize_evidence_links_none_returns_none():
-    assert TestRepository._normalize_evidence_links(None) is None
+    def test_normalize_evidence_links_non_list_raises(self):
+        with self.assertRaises(ValueError):
+            TestRepository._normalize_evidence_links("not-a-list")
 
+    def test_normalize_evidence_links_filters_none_and_empty_and_dedups(self):
+        links = [None, "  http://a.com  ", "", "http://a.com", "http://b.com"]
+        cleaned = TestRepository._normalize_evidence_links(links)
+        self.assertEqual(cleaned, ["http://a.com", "http://b.com"])
 
-def test_normalize_evidence_links_non_list_raises():
-    with pytest.raises(ValueError):
-        TestRepository._normalize_evidence_links("not-a-list")
-
-
-def test_normalize_evidence_links_filters_none_and_empty_and_dedups():
-    links = [None, "  http://a.com  ", "", "http://a.com", "http://b.com"]
-    cleaned = TestRepository._normalize_evidence_links(links)
-    assert cleaned == ["http://a.com", "http://b.com"]
-
-
-def test_normalize_evidence_links_preserves_order_first_occurrence():
-    links = ["b", "a", "b", "c"]
-    assert TestRepository._normalize_evidence_links(links) == ["b", "a", "c"]
+    def test_normalize_evidence_links_preserves_order_first_occurrence(self):
+        links = ["b", "a", "b", "c"]
+        self.assertEqual(TestRepository._normalize_evidence_links(links), ["b", "a", "c"]) 
