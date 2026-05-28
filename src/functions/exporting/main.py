@@ -25,7 +25,7 @@ def serialize_value(v):
     if isinstance(v, bool):
         return "Yes" if v else "No"
     if isinstance(v, (list, tuple)):
-        return ";".join([str(x) for x in v])
+        return ";".join([serialize_value(x) for x in v])
     if v is None:
         return ""
     return str(v)
@@ -194,6 +194,8 @@ def format_controls_csv(rows):
         "Date Created",
         "Last Tested",
     ]
+    if not rows:
+        return headers, []
     data = []
     for row in rows:
         data.append(
@@ -503,6 +505,9 @@ def format_dashboard_csv():
     for t in tests:
         tester_id = t.get("assigned_tester_id")
         tests_by_tester.setdefault(tester_id, []).append(t)
+
+    # add a label row to explain the tester value format
+    rows.append(["Tester", "In Progress | Total Assigned"])
 
     for u in users:
         uid = u.get("user_id")

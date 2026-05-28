@@ -36,6 +36,9 @@ Parameters:
   SharedBucketArn:
     Type: String
     Default: arn:aws:s3:::aws-sam-cli-managed-default-samclisourcebucket-mkpwwj7siylh
+  HelpMediaBucketName:
+    Type: String
+    Default: vcat-help-videos
 
 Resources:
   VcatApi:
@@ -343,6 +346,30 @@ Resources:
       FunctionName: !Ref ImportFunction
       Principal: s3.amazonaws.com
       SourceArn: !Ref SharedBucketArn
+
+  HelpMediaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/functions/help_media/
+      Handler: main.lambda_handler
+      Layers:
+        - !Ref CommonDependencyLayer
+      Environment:
+        Variables:
+          HELP_MEDIA_BUCKET_NAME: !Ref HelpMediaBucketName
+          HELP_MEDIA_PRESIGNED_URL_TTL_SECONDS: "900"
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref HelpMediaBucketName
+      Events:
+        GetHelpMediaUrl:
+          Type: Api
+          Properties:
+            Path: /help-media
+            Method: get
+            RestApiId: !Ref VcatApi
+            Auth:
+              Authorizer: MyCognitoAuthorizer
 
   NotificationsFunction:
     Type: AWS::Serverless::Function

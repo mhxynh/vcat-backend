@@ -215,3 +215,25 @@ class TestS3Utils(TestCase):
             },
             ExpiresIn=900,
         )
+
+    @patch("utils.s3_utils.S3Utils.get_client")
+    def test_generate_presigned_get_url_uses_expected_params(self, mock_get_client):
+        client = MagicMock()
+        client.generate_presigned_url.return_value = "https://example.com/download"
+        mock_get_client.return_value = client
+
+        url = S3Utils.generate_presigned_get_url(
+            bucket_name="media-bucket",
+            object_key="quickstart.mp4",
+            expires_in=900,
+        )
+
+        self.assertEqual(url, "https://example.com/download")
+        client.generate_presigned_url.assert_called_once_with(
+            "get_object",
+            Params={
+                "Bucket": "media-bucket",
+                "Key": "quickstart.mp4",
+            },
+            ExpiresIn=900,
+        )

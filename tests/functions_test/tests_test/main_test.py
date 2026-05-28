@@ -108,6 +108,45 @@ class TestTestsMain(TestCase):
         self.assertEqual(json.loads(result["body"])["test_id"], 1)
 
     @patch('functions.tests.main.TestRepository')
+    def test_post_test_without_request_id_returns_200(self, mock_repo):
+        body = {
+            "vgcpid": "VGCP-001", "requires_dat": True,
+            "requires_oet": False, "due_date": "2026-03-01", "description": "Test control"
+        }
+        mock_repo.create.return_value = {**body, "request_id": None, "test_id": 1}
+        event = self._build_event("POST", "/tests", body=body)
+
+        result = tests_main.lambda_handler(event, None)
+
+        mock_repo.create.assert_called_once_with(
+            vgcpid="VGCP-001",
+            request_id=None,
+            description="Test control",
+            requires_dat=True,
+            requires_oet=False,
+            due_date="2026-03-01",
+            assigned_tester_id=None,
+            estimated_date=None,
+            evidence_links=None,
+        )
+        self.assertEqual(result["statusCode"], 200)
+        self.assertIsNone(json.loads(result["body"])["request_id"])
+
+    @patch('functions.tests.main.TestRepository')
+    def test_post_test_with_blank_request_id_returns_200(self, mock_repo):
+        body = {
+            "vgcpid": "VGCP-001", "request_id": "", "requires_dat": True,
+            "requires_oet": False, "due_date": "2026-03-01", "description": "Test control"
+        }
+        mock_repo.create.return_value = {**body, "request_id": None, "test_id": 1}
+        event = self._build_event("POST", "/tests", body=body)
+
+        result = tests_main.lambda_handler(event, None)
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(mock_repo.create.call_args.kwargs["request_id"], None)
+
+    @patch('functions.tests.main.TestRepository')
     def test_post_test_bad_vgcpid_returns_400(self, mock_repo):
         body = {
             "vgcpid": "BAD-VGCPID", "request_id": 100, "requires_dat": True, 
@@ -122,7 +161,7 @@ class TestTestsMain(TestCase):
         self.assertIn("Failed to create test. Verify that VGCPID exists.", json.loads(result["body"])["error"])
 
     def test_post_test_missing_required_returns_400(self):
-        body = {"vgcpid": "VGCP-001"} # Missing request_id, description, etc.
+        body = {"vgcpid": "VGCP-001"} # Missing description, track flags, etc.
         event = self._build_event("POST", "/tests", body=body)
         
         result = tests_main.lambda_handler(event, None)
