@@ -30,16 +30,13 @@ class TestUsersMain(TestCase):
         self.assertEqual(result["statusCode"], 400)
         self.assertIn("No event data", json.loads(result["body"])["error"])
 
-    @patch('functions.users.main.Logger')
-    @patch('functions.users.main.ResponseUtils')
-    def test_options_returns_cors(self, mock_responseutils, mock_logger):
-        mock_responseutils.cors_preflight.return_value = {"statusCode": 200, "headers": {"cors": True}, "body": ""}
-
+    def test_options_returns_cors(self):
         event = self._build_event("OPTIONS", "/users")
         result = users.lambda_handler(event, None)
 
-        self.assertEqual(result, {"statusCode": 200, "headers": {"cors": True}, "body": ""})
-        mock_responseutils.cors_preflight.assert_called_once()
+        self.assertEqual(result["statusCode"], 200)
+        self.assertIn("Access-Control-Allow-Origin", result["headers"])
+        self.assertEqual(result["headers"]["Access-Control-Allow-Origin"], "*")
 
     # GET /users
 
@@ -140,6 +137,16 @@ class TestUsersMain(TestCase):
 
         mock_logger.log.assert_any_call(level="WARNING", message="User not found for deactivate", extra_fields={"user_id": "999"})
         self.assertEqual(result["statusCode"], 404)
+
+    @patch('functions.users.main.Logger')
+    def test_delete_user_forbidden_returns_403(self, mock_logger):
+        self.mock_auth.is_manager.return_value = False
+
+        event = self._build_event("DELETE", "/users/9", path_params={"id": "9"})
+        result = users.lambda_handler(event, None)
+
+        mock_logger.log.assert_any_call(level="WARNING", message="Unauthorized user deactivation attempt")
+        self.assertEqual(result["statusCode"], 403)
 
     @patch('functions.users.main.Logger')
     def test_delete_user_no_id_returns_400(self, mock_logger):

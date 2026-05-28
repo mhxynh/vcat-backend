@@ -15,6 +15,13 @@ class TestCrudUtils(TestCase):
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         return mock_conn, mock_cursor
 
+    def test_set_and_clear_audit_context(self):
+        CrudUtils.set_audit_context(actor_user_id=123)
+        self.assertEqual(CrudUtils._audit_context, {"actor_user_id": 123})
+
+        CrudUtils.clear_audit_context()
+        self.assertIsNone(CrudUtils._audit_context)
+
     # Get All
 
     @patch('utils.crud.DbUtils')
@@ -207,6 +214,29 @@ class TestCrudUtils(TestCase):
         self.assertIsNone(result)
         mock_conn.close.assert_called_once()
 
+    @patch('utils.crud.AuditUtils')
+    @patch('utils.crud.DbUtils')
+    def test_update_with_audit_context_fetches_before_row(self, mock_db, mock_audit):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.side_effect = [
+            {"control_id": 1, "vgcpid": "VGCP-001", "description": "Before"},
+            {"control_id": 1, "vgcpid": "VGCP-001", "description": "After"},
+        ]
+        mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_table_audit_config.return_value = True
+
+        CrudUtils.set_audit_context(actor_user_id=7)
+        result = CrudUtils.update("controls", "vgcpid", "VGCP-001", {"description": "After"})
+
+        self.assertEqual(mock_cursor.execute.call_args_list[0].args[0], "SELECT * FROM controls WHERE vgcpid = %s")
+        self.assertEqual(mock_cursor.execute.call_args_list[1].args[0], "UPDATE controls SET description = %s WHERE vgcpid = %s RETURNING *")
+        self.assertEqual(result["description"], "After")
+        mock_audit.audit_update.assert_called_once()
+        CrudUtils.clear_audit_context()
+
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
     def test_update_raises_and_logs_on_error(self, mock_db, mock_logger):
@@ -231,6 +261,29 @@ class TestCrudUtils(TestCase):
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
         self.assertEqual(result["is_active"], False)
+
+    @patch('utils.crud.AuditUtils')
+    @patch('utils.crud.DbUtils')
+    def test_deactivate_with_audit_context_fetches_before_row(self, mock_db, mock_audit):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.side_effect = [
+            {"control_id": 1, "vgcpid": "VGCP-001", "is_active": True},
+            {"control_id": 1, "vgcpid": "VGCP-001", "is_active": False},
+        ]
+        mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_table_audit_config.return_value = True
+
+        CrudUtils.set_audit_context(actor_user_id=7)
+        result = CrudUtils.deactivate("controls", "vgcpid", "VGCP-001")
+
+        self.assertEqual(mock_cursor.execute.call_args_list[0].args[0], "SELECT * FROM controls WHERE vgcpid = %s")
+        self.assertEqual(mock_cursor.execute.call_args_list[1].args[0], "UPDATE controls SET is_active = FALSE WHERE vgcpid = %s RETURNING *")
+        self.assertFalse(result["is_active"])
+        mock_audit.audit_delete.assert_called_once()
+        CrudUtils.clear_audit_context()
 
     @patch('utils.crud.Logger')
     @patch('utils.crud.DbUtils')
@@ -259,6 +312,29 @@ class TestCrudUtils(TestCase):
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
         self.assertEqual(result["vgcpid"], "VGCP-001")
+
+    @patch('utils.crud.AuditUtils')
+    @patch('utils.crud.DbUtils')
+    def test_hard_delete_with_audit_context_fetches_before_row(self, mock_db, mock_audit):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.side_effect = [
+            {"comment_id": 19, "author_user_id": 1, "test_id": 10},
+            {"comment_id": 19, "author_user_id": 1, "test_id": 10},
+        ]
+        mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_table_audit_config.return_value = True
+
+        CrudUtils.set_audit_context(actor_user_id=7)
+        result = CrudUtils.hard_delete("comments", ["comment_id", "author_user_id", "test_id"], [19, 1, 10])
+
+        self.assertEqual(mock_cursor.execute.call_args_list[0].args[0], "SELECT * FROM comments WHERE comment_id = %s AND author_user_id = %s AND test_id = %s")
+        self.assertEqual(mock_cursor.execute.call_args_list[1].args[0], "DELETE FROM comments WHERE comment_id = %s AND author_user_id = %s AND test_id = %s RETURNING *")
+        self.assertEqual(result["comment_id"], 19)
+        mock_audit.audit_delete.assert_called_once()
+        CrudUtils.clear_audit_context()
 
     @patch('utils.crud.DbUtils')
     def test_hard_delete_success_with_multiple_columns(self, mock_db):
