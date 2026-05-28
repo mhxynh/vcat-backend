@@ -371,23 +371,6 @@ Resources:
             Auth:
               Authorizer: MyCognitoAuthorizer
 
-  NotificationsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/functions/notifications/
-      Handler: main.lambda_handler
-      Layers:
-        - !Ref CommonDependencyLayer
-      Events:
-        GetNotifications:
-          Type: Api
-          Properties:
-            Path: /notifications
-            Method: get
-            RestApiId: !Ref VcatApi
-            Auth:
-              Authorizer: MyCognitoAuthorizer
-
   UserFunction:
     Type: AWS::Serverless::Function
     Properties:
