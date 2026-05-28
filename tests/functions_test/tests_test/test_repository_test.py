@@ -1,8 +1,6 @@
+import pytest
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
-
-import pytest
-
 from functions.tests.test_repository import TestRepository
 
 class TestTestRepository(TestCase):

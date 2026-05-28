@@ -1,7 +1,6 @@
 from datetime import datetime
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
-
 from utils.audit import AuditUtils
 from utils.test_audit import TestAuditUtils as TestAuditHelper
 
