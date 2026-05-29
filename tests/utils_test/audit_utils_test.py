@@ -1,8 +1,8 @@
 from datetime import datetime
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
-
 from utils.audit import AuditUtils
+from utils.test_audit import TestAuditUtils as TestAuditHelper
 
 
 class TestAuditUtils(TestCase):
@@ -101,4 +101,57 @@ class TestAuditUtils(TestCase):
 
         AuditUtils.audit_delete(cur, "users", before, deleted, ctx, is_soft_delete=True)
         AuditUtils.audit_delete(cur, "users", before, deleted, ctx, is_soft_delete=False)
+        self.assertEqual(mock_insert.call_count, 2)
+
+
+class TestTestAuditUtils(TestCase):
+    def tearDown(self):
+        TestAuditHelper.clear_context()
+
+    def test_context_set_get_clear(self):
+        TestAuditHelper.set_context(actor_user_id=7)
+        self.assertEqual(TestAuditHelper.get_context()["actor_user_id"], 7)
+        TestAuditHelper.clear_context()
+        self.assertIsNone(TestAuditHelper.get_context())
+
+    def test_snapshot_and_fetch_before(self):
+        row = {"test_id": 1, "request_id": 2, "extra": "x"}
+        snapshot = TestAuditHelper.snapshot(row)
+        self.assertEqual(snapshot["test_id"], 1)
+        self.assertNotIn("extra", snapshot)
+
+        cur = MagicMock()
+        cur.fetchone.return_value = {"test_id": 1}
+        before = TestAuditHelper.fetch_before(cur, 1)
+        cur.execute.assert_called_once_with("SELECT * FROM tests WHERE test_id = %s", (1,))
+        self.assertEqual(before["test_id"], 1)
+
+    @patch("utils.test_audit.AuditUtils.insert_audit_row")
+    def test_audit_create_and_no_context_guard(self, mock_insert):
+        TestAuditHelper.audit_create(MagicMock(), {"test_id": 1})
+        mock_insert.assert_not_called()
+
+        TestAuditHelper.set_context(actor_user_id=3)
+        TestAuditHelper.audit_create(MagicMock(), {"test_id": 1, "status": "NOT_STARTED"})
+        mock_insert.assert_called_once()
+
+    @patch("utils.test_audit.AuditUtils.insert_audit_row")
+    def test_audit_update_and_no_diff_guard(self, mock_insert):
+        TestAuditHelper.set_context(actor_user_id=3)
+        before = {"test_id": 1, "status": "A"}
+        after = {"test_id": 1, "status": "A"}
+        TestAuditHelper.audit_update(MagicMock(), before, after)
+        mock_insert.assert_not_called()
+
+        after2 = {"test_id": 1, "status": "B"}
+        TestAuditHelper.audit_update(MagicMock(), before, after2)
+        mock_insert.assert_called_once()
+
+    @patch("utils.test_audit.AuditUtils.insert_audit_row")
+    def test_audit_soft_and_hard_delete(self, mock_insert):
+        TestAuditHelper.set_context(actor_user_id=9)
+        before = {"test_id": 2, "status": "OET_IN_PROGRESS"}
+        after = {"test_id": 2, "status": "ARCHIVED"}
+        TestAuditHelper.audit_soft_delete(MagicMock(), before, after)
+        TestAuditHelper.audit_hard_delete(MagicMock(), before, {"test_id": 2})
         self.assertEqual(mock_insert.call_count, 2)

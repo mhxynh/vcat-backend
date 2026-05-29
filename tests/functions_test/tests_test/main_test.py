@@ -1,7 +1,7 @@
 import json
+import functions.tests.main as tests_main
 from unittest import TestCase
 from unittest.mock import patch
-import functions.tests.main as tests_main
 
 class TestTestsMain(TestCase):
     def setUp(self):

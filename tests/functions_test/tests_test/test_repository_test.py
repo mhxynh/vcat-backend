@@ -251,8 +251,9 @@ class TestTestRepository(TestCase):
             TestRepository.update_evidence_links(42, ["https://example.com/evidence"])
         mock_logger.log.assert_called_once()
 
+    @patch('functions.tests.test_repository.Logger')
     @patch('functions.tests.test_repository.DbUtils')
-    def test_update_evidence_links_invalid_payload_raises(self, mock_db):
+    def test_update_evidence_links_invalid_payload_raises(self, mock_db, mock_logger):
         mock_conn, mock_cursor = self._mock_connection(None, fetchone=True)
         mock_db.get_db_connection.return_value = mock_conn
 
@@ -625,3 +626,111 @@ class TestTestRepository(TestCase):
 
         mock_audit.fetch_before.assert_called_once()
         mock_audit.audit_hard_delete.assert_called_once()
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_details_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "control_id": 10}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "description": "Before"}
+
+        result = TestRepository.update_details(
+            42,
+            "VGCP-101010",
+            2,
+            505,
+            False,
+            True,
+            "2026-04-01",
+            "2026-03-25",
+            "Updated Desc",
+            ["https://example.com/evidence"],
+        )
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        self.assertEqual(result["test_id"], 42)
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_evidence_links_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "evidence_links": []}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "evidence_links": ["old"]}
+
+        result = TestRepository.update_evidence_links(42, ["https://example.com/evidence"])
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        self.assertEqual(result["test_id"], 42)
+
+    @patch('functions.tests.test_repository.Logger')
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_evidence_links_none_payload_raises(self, mock_db, mock_audit, mock_logger):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = None
+
+        with self.assertRaises(ValueError):
+            TestRepository.update_evidence_links(42, None)
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_dat_track_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "dat_step": "Phase 2", "status": "DAT_IN_PROGRESS"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "dat_step": "Phase 1", "status": "NOT_STARTED"}
+
+        result = TestRepository.update_dat_track(42, "Phase 2", "DAT_IN_PROGRESS")
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        self.assertEqual(result["status"], "DAT_IN_PROGRESS")
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_update_oet_track_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "oet_step": "Step 1", "status": "OET_IN_PROGRESS"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "oet_step": "Step 0", "status": "NOT_STARTED"}
+
+        result = TestRepository.update_oet_track(42, "Step 1", "OET_IN_PROGRESS")
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        self.assertEqual(result["status"], "OET_IN_PROGRESS")
+
+    @patch('functions.tests.test_repository.TestAuditUtils')
+    @patch('functions.tests.test_repository.DbUtils')
+    def test_review_test_with_audit_context(self, mock_db, mock_audit):
+        mock_conn, mock_cursor = self._mock_connection({"test_id": 42, "status": "IN_REVIEW"}, fetchone=True)
+        mock_db.get_db_connection.return_value = mock_conn
+        mock_audit.get_context.return_value = {"actor_user_id": 1}
+        mock_audit.fetch_before.return_value = {"test_id": 42, "status": "DAT_IN_PROGRESS"}
+
+        result = TestRepository.review_test(42)
+
+        mock_audit.fetch_before.assert_called_once()
+        mock_audit.audit_update.assert_called_once()
+        self.assertEqual(result["status"], "IN_REVIEW")
+
+    def test_normalize_evidence_links_none_returns_none(self):
+        self.assertIsNone(TestRepository._normalize_evidence_links(None))
+
+    def test_normalize_evidence_links_non_list_raises(self):
+        with self.assertRaises(ValueError):
+            TestRepository._normalize_evidence_links("not-a-list")
+
+    def test_normalize_evidence_links_filters_none_and_empty_and_dedups(self):
+        links = [None, "  http://a.com  ", "", "http://a.com", "http://b.com"]
+        cleaned = TestRepository._normalize_evidence_links(links)
+        self.assertEqual(cleaned, ["http://a.com", "http://b.com"])
+
+    def test_normalize_evidence_links_preserves_order_first_occurrence(self):
+        links = ["b", "a", "b", "c"]
+        self.assertEqual(TestRepository._normalize_evidence_links(links), ["b", "a", "c"]) 
