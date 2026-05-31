@@ -34,6 +34,14 @@ For Docker local development, compose builds a `vcat-backend-lambda-local` invok
 
 The backend entrypoint derives SAM's Docker-visible `.aws-sam/build` path from the `/app` bind mount. If that path is incorrect for your Docker engine, set `SAM_DOCKER_VOLUME_BASEDIR` manually, then rerun `docker compose up --build`.
 
+To verify the running Docker stack, run:
+
+```bash
+python scripts/docker_smoke_test.py
+```
+
+The smoke test checks the frontend, backend API, key read routes, a temporary create/update/delete workflow, and the export/import/help-media URL routes. It deletes its temporary data before exiting.
+
 ## Step-by-Step Local Start
 
 1. **Clone the repo**: `git clone https://github.com/mhxynh/vcat-backend.git`
