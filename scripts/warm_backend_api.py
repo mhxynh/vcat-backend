@@ -6,7 +6,6 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-
 BASE_URL = "http://127.0.0.1:3001"
 READY_MARKER = Path("/tmp/vcat-backend-warmed")
 REQUEST_TIMEOUT_SECONDS = 180

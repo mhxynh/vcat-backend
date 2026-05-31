@@ -2,7 +2,6 @@ from pathlib import Path
 import argparse
 import sys
 
-
 DEFAULT_SOURCE_TEMPLATE = Path("template.yaml")
 DEFAULT_OUTPUT_TEMPLATE = Path(".aws-sam/docker-template.yaml")
 
@@ -20,7 +19,9 @@ def rewrite_code_uri(line: str, code_uri_prefix: str) -> str:
     return f"{indent}CodeUri: {code_uri_prefix}{value}\n"
 
 
-def prepare_template(source_template: Path, output_template: Path, code_uri_prefix: str) -> None:
+def prepare_template(
+    source_template: Path, output_template: Path, code_uri_prefix: str
+) -> None:
     lines = source_template.read_text().splitlines(keepends=True)
     updated = []
     index = 0
