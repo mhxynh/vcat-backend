@@ -1,0 +1,105 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vcat-postgres
+    environment:
+      POSTGRES_DB: vcat_sandbox
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - vcat-postgres-data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vcat_sandbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - vcat-dev
+
+  backend:
+    build:
+      context: .
+    container_name: vcat-backend
+    depends_on:
+      lambda-runtime:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      DB_HOST: postgres
+      DB_NAME: vcat_sandbox
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_PORT: "5432"
+      SAM_CLI_CONTAINER_CONNECTION_TIMEOUT: "60"
+      SAM_CLI_TELEMETRY: "0"
+      SAM_CONTAINER_HOST: ${SAM_CONTAINER_HOST:-host.docker.internal}
+      SAM_DOCKER_VOLUME_BASEDIR: ${SAM_DOCKER_VOLUME_BASEDIR:-}
+      WARM_BACKEND_ROUTES: ${WARM_BACKEND_ROUTES:-core}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "test -f /tmp/vcat-backend-warmed",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 900s
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERPROFILE:-${HOME}}/.aws:/root/.aws:ro
+    networks:
+      - vcat-dev
+
+  lambda-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.lambda-local
+    image: vcat-backend-lambda-local:latest
+    entrypoint: ["/bin/true"]
+
+  frontend:
+    build:
+      context: ../vcat-frontend
+    container_name: vcat-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      - ../vcat-frontend/.env
+    environment:
+      BROWSER: none
+      CHOKIDAR_USEPOLLING: "true"
+      CI: "false"
+      HOST: 0.0.0.0
+      PORT: "3000"
+      REACT_APP_API_BASE_URL: http://localhost:3001
+      REACT_APP_DISABLE_STRICT_MODE: "true"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../vcat-frontend:/app
+      - frontend-node-modules:/app/node_modules
+    networks:
+      - vcat-dev
+
+volumes:
+  frontend-node-modules:
+  vcat-postgres-data:
+
+networks:
+  vcat-dev:
+    name: vcat-dev

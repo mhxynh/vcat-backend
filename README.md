@@ -2,6 +2,38 @@
 
 This repository contains the serverless infrastructure and API logic for the Vanguard Controls Automation Tool (V-CAT).
 
+## Docker Local Stack
+
+For full-stack local development, clone the backend and frontend repositories as siblings:
+
+```text
+vcats/
+  vcat-backend/
+  vcat-frontend/
+```
+
+Then start the full local stack from this backend repository:
+
+```bash
+docker compose up --build
+```
+
+The frontend container loads Cognito values from `../vcat-frontend/.env`, so make sure that file contains real `REACT_APP_USER_POOL_ID` and `REACT_APP_APP_CLIENT_ID` values before logging in.
+
+This starts:
+
+- Postgres at `localhost:5432`
+- Backend SAM local API at `http://localhost:3001`
+- Frontend React app at `http://localhost:3000`
+
+The first startup can take a little longer because compose builds the local Lambda invoke image and the backend container warms the core local SAM API routes before the frontend starts. To warm every mounted route before the frontend starts, run with `WARM_BACKEND_ROUTES=all docker compose up --build`; to only wait until SAM is listening, use `WARM_BACKEND_ROUTES=off`.
+
+Postgres is initialized from `database/schema.sql` and `database/seed.sql` the first time the Docker volume is created. Cognito is not containerized; the frontend and backend continue to use the AWS-hosted Cognito configuration.
+
+For Docker local development, compose builds a `vcat-backend-lambda-local` invoke image containing the shared Python dependencies that normally live in `CommonDependencyLayer`. The backend entrypoint generates `.aws-sam/docker-template.yaml` from `template.yaml`, removes that local layer from the Docker-only template, and runs `sam local start-api` directly against the source folders. SAM launches Lambda runtime containers through Docker, so the compose service mounts the Docker socket, joins those Lambda containers to the `vcat-dev` network, and uses `host.docker.internal` for SAM-to-Lambda runtime traffic. The Docker command uses SAM's `docker` config environment so it does not inherit the default eager warm-container setting from `samconfig.toml`.
+
+The backend entrypoint derives SAM's Docker-visible `.aws-sam/build` path from the `/app` bind mount. If that path is incorrect for your Docker engine, set `SAM_DOCKER_VOLUME_BASEDIR` manually, then rerun `docker compose up --build`.
+
 ## Step-by-Step Local Start
 
 1. **Clone the repo**: `git clone https://github.com/mhxynh/vcat-backend.git`
