@@ -1,4 +1,4 @@
-FROM public.ecr.aws/sam/build-python3.12:latest
+FROM public.ecr.aws/sam/build-python3.12:1.140.0
 
 WORKDIR /app
 
