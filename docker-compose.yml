@@ -37,6 +37,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_PORT: "5432"
+      DOCKER_API_VERSION: "1.44"
       SAM_CLI_CONTAINER_CONNECTION_TIMEOUT: "60"
       SAM_CLI_TELEMETRY: "0"
       SAM_CONTAINER_HOST: ${SAM_CONTAINER_HOST:-host.docker.internal}
