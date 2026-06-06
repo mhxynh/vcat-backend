@@ -245,7 +245,7 @@ def lambda_handler(event, context):
                     return ResponseUtils.http_response(
                         StatusCodes.CONFLICT,
                         {
-                            "error": "Cannot hard delete completed test."
+                            "error": "Cannot hard delete completed test. "
                             "Only archive/unarchive allowed.",
                             "test_id": test_id,
                             "status": current_status,
