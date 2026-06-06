@@ -190,6 +190,7 @@ def run_smoke_test() -> list[SmokeResult]:
         request = first_row(requests, "request")
         user = first_row(users, "user")
 
+        control_db_id = control["control_id"]
         control_id = control["vgcpid"]
         test_id_for_read = test["test_id"]
         request_id_for_read = request["request_id"]
@@ -202,7 +203,7 @@ def run_smoke_test() -> list[SmokeResult]:
             "GET",
             f"/tests?request_id={request_id_for_read}&details=true",
         )
-        client.request("GET tests by control", "GET", f"/tests?control_id={control_id}")
+        client.request("GET tests by control", "GET", f"/tests?control_id={control_db_id}")
         client.request("GET request detail", "GET", f"/requests/{request_id_for_read}")
         client.request("GET comments list", "GET", "/comments")
         client.request(
