@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: vcat-postgres
     environment:
-      POSTGRES_DB: vcat_sandbox
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-vcat_sandbox}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -33,10 +33,10 @@ services:
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
       AWS_PROFILE: ${AWS_PROFILE:-default}
       DB_HOST: postgres
-      DB_NAME: vcat_sandbox
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-vcat_sandbox}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
       DOCKER_API_VERSION: "1.44"
       SAM_CLI_CONTAINER_CONNECTION_TIMEOUT: "60"
       SAM_CLI_TELEMETRY: "0"
@@ -49,11 +49,7 @@ services:
     ports:
       - "3001:3001"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "test -f /tmp/vcat-backend-warmed",
-        ]
+      test: ["CMD-SHELL", "test -f /tmp/vcat-backend-warmed"]
       interval: 30s
       timeout: 10s
       retries: 30

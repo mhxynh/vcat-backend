@@ -4,6 +4,12 @@ set -eu
 APP_MOUNT_INFO="$(awk '$5 == "/app" { print; exit }' /proc/self/mountinfo)"
 HOST_APP_ROOT="$(printf '%s\n' "$APP_MOUNT_INFO" | awk '{ print $4 }')"
 
+if [ -z "$APP_MOUNT_INFO" ] || [ -z "$HOST_APP_ROOT" ]; then
+  echo "Error: unable to locate the /app bind mount in /proc/self/mountinfo." >&2
+  echo "Start the backend container with the repository mounted at /app (for example, -v .:/app)." >&2
+  exit 1
+fi
+
 case "$APP_MOUNT_INFO" in
   *"path=C:"*)
     HOST_APP_ROOT="/run/desktop/mnt/host/c${HOST_APP_ROOT}"
