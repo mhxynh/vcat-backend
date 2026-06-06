@@ -3,7 +3,7 @@ import argparse
 import sys
 
 DEFAULT_SOURCE_TEMPLATE = Path("template.yaml")
-DEFAULT_OUTPUT_TEMPLATE = Path(".aws-sam/docker-template.yaml")
+DEFAULT_OUTPUT_TEMPLATE = Path(".docker-sam/docker-template.yaml")
 
 
 def rewrite_code_uri(line: str, code_uri_prefix: str) -> str:
