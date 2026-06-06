@@ -21,6 +21,7 @@ services:
       - vcat-dev
 
   backend:
+    platform: linux/amd64
     build:
       context: .
     container_name: vcat-backend
@@ -42,7 +43,6 @@ services:
       SAM_CLI_TELEMETRY: "0"
       SAM_CONTAINER_HOST: ${SAM_CONTAINER_HOST:-host.docker.internal}
       SAM_DOCKER_VOLUME_BASEDIR: ${SAM_DOCKER_VOLUME_BASEDIR:-}
-      SAM_FUNCTION_ARCHITECTURE: ${SAM_FUNCTION_ARCHITECTURE:-}
       WARM_BACKEND_ROUTES: ${WARM_BACKEND_ROUTES:-core}
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -66,6 +66,7 @@ services:
       - vcat-dev
 
   lambda-runtime:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile.lambda-local

@@ -12,26 +12,11 @@ esac
 
 SAM_TEMPLATE=".docker-sam/docker-template.yaml"
 SAM_VOLUME_BASE="${SAM_DOCKER_VOLUME_BASEDIR:-${HOST_APP_ROOT}/.docker-sam}"
-DOCKER_ARCHITECTURE="$(docker info --format '{{.Architecture}}' 2>/dev/null || true)"
-
-case "${SAM_FUNCTION_ARCHITECTURE:-$DOCKER_ARCHITECTURE}" in
-  amd64|x86_64)
-    SAM_FUNCTION_ARCHITECTURE="x86_64"
-    ;;
-  arm64|aarch64)
-    SAM_FUNCTION_ARCHITECTURE="arm64"
-    ;;
-  *)
-    SAM_FUNCTION_ARCHITECTURE="x86_64"
-    ;;
-esac
-echo "Using $SAM_FUNCTION_ARCHITECTURE for Docker local SAM template."
 
 python /app/scripts/prepare_sam_docker_template.py \
   --source template.yaml \
   --output "$SAM_TEMPLATE" \
-  --code-uri-prefix "../" \
-  --architecture "$SAM_FUNCTION_ARCHITECTURE"
+  --code-uri-prefix "../"
 
 rm -f /tmp/vcat-backend-warmed
 
