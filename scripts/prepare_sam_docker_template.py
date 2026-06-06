@@ -6,12 +6,16 @@ DEFAULT_SOURCE_TEMPLATE = Path("template.yaml")
 DEFAULT_OUTPUT_TEMPLATE = Path(".docker-sam/docker-template.yaml")
 
 
-def rewrite_code_uri(line: str, code_uri_prefix: str) -> str:
+def rewrite_line(line: str, code_uri_prefix: str, architecture: str | None) -> str:
     stripped = line.strip()
+    indent = line[: len(line) - len(line.lstrip())]
+
+    if architecture and stripped.startswith("Architectures:"):
+        return f"{indent}Architectures: [{architecture}]\n"
+
     if not stripped.startswith("CodeUri:"):
         return line
 
-    indent = line[: len(line) - len(line.lstrip())]
     value = stripped.split(":", 1)[1].strip()
     if not value.startswith("src"):
         return line
@@ -20,7 +24,10 @@ def rewrite_code_uri(line: str, code_uri_prefix: str) -> str:
 
 
 def prepare_template(
-    source_template: Path, output_template: Path, code_uri_prefix: str
+    source_template: Path,
+    output_template: Path,
+    code_uri_prefix: str,
+    architecture: str | None,
 ) -> None:
     lines = source_template.read_text().splitlines(keepends=True)
     updated = []
@@ -57,7 +64,7 @@ def prepare_template(
 
     output_template.parent.mkdir(parents=True, exist_ok=True)
     output_template.write_text(
-        "".join(rewrite_code_uri(line, code_uri_prefix) for line in updated)
+        "".join(rewrite_line(line, code_uri_prefix, architecture) for line in updated)
     )
 
 
@@ -66,6 +73,7 @@ def main() -> int:
     parser.add_argument("--source", default=str(DEFAULT_SOURCE_TEMPLATE))
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_TEMPLATE))
     parser.add_argument("--code-uri-prefix", default="../")
+    parser.add_argument("--architecture", choices=("x86_64", "arm64"))
     args = parser.parse_args()
 
     source_template = Path(args.source)
@@ -75,7 +83,12 @@ def main() -> int:
         print(f"Could not find SAM template at {source_template}", file=sys.stderr)
         return 1
 
-    prepare_template(source_template, output_template, args.code_uri_prefix)
+    prepare_template(
+        source_template,
+        output_template,
+        args.code_uri_prefix,
+        args.architecture,
+    )
     print(f"Prepared {output_template} for Docker local invoke image.", flush=True)
     return 0
 
