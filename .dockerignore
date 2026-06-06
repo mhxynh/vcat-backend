@@ -1,0 +1,13 @@
+.aws-sam/
+.docker-sam/
+.coverage
+.env
+.env.*
+env.json
+.git/
+.pytest_cache/
+.venv/
+__pycache__/
+*.py[cod]
+htmlcov/
+venv/

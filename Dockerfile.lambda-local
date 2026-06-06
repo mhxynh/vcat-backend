@@ -1,0 +1,12 @@
+FROM public.ecr.aws/lambda/python:3.12
+
+WORKDIR /var/task
+
+COPY src/functions/common/python/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt -t /opt/python
+
+COPY src/functions/common/python/ /opt/python/
+
+ENV PYTHONPATH="/opt/python:${PYTHONPATH}"
+
+CMD ["/bin/true"]
