@@ -21,7 +21,6 @@ services:
       - vcat-dev
 
   backend:
-    platform: linux/amd64
     build:
       context: .
     container_name: vcat-backend
