@@ -65,7 +65,6 @@ services:
       - vcat-dev
 
   lambda-runtime:
-    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile.lambda-local

@@ -1,5 +1,4 @@
 .aws-sam/
-.docker-sam/
 .coverage
 .env
 .env.*

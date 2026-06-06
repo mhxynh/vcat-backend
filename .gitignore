@@ -32,9 +32,6 @@ ENV/
 # AWS SAM - CRITICAL DO NOT REMOVE
 .aws-sam/
 
-# Docker-only SAM artifacts
-.docker-sam/
-
 # OS & IDE Files
 .DS_Store
 .vscode/

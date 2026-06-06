@@ -10,8 +10,8 @@ case "$APP_MOUNT_INFO" in
     ;;
 esac
 
-SAM_TEMPLATE=".docker-sam/docker-template.yaml"
-SAM_VOLUME_BASE="${SAM_DOCKER_VOLUME_BASEDIR:-${HOST_APP_ROOT}/.docker-sam}"
+SAM_TEMPLATE=".aws-sam/docker-template.yaml"
+SAM_VOLUME_BASE="${SAM_DOCKER_VOLUME_BASEDIR:-${HOST_APP_ROOT}/.aws-sam}"
 
 python /app/scripts/prepare_sam_docker_template.py \
   --source template.yaml \
