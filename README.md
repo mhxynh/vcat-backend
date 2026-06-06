@@ -12,7 +12,7 @@ This repository contains the serverless infrastructure, database schemas, and AP
 - **Data Persistence:** Centrally managed relational database via AWS RDS for all operational data, control tracking, and system state.
 - **File Import/Export Engine:** Dedicated integration with Amazon S3 strictly utilized for importing compliance datasets and exporting generated reports.
 - **Authentication & Access Control:** Native integration with Amazon Cognito User Pools for secure user authentication and session validation.
-- **Automated Testing Framework:** Complete suite of unit, integration (via Postman collection runs), and End-to-End (E2E) testing configurations covering 495 total automated test cases.
+- **Automated Testing Framework:** Pytest-based unit test suite with coverage enforced in CI (see `.github/workflows/test.yml`).covering 495 total automated test cases.
 
 ### Features Not Implemented (Future Scope)
 
@@ -57,7 +57,7 @@ This command initializes and starts:
 The first startup can take a little longer because compose builds the local Lambda invoke image and the backend container warms the core local SAM API routes before the frontend starts.
 
 - To warm every mounted route before the frontend starts: `WARM_BACKEND_ROUTES=all docker compose up --build`
-- To skip warmup and only wait until SAM is listening: W`ARM_BACKEND_ROUTES=off docker compose up --build`
+- To skip warmup and only wait until SAM is listening: `WARM_BACKEND_ROUTES=off docker compose up --build`
 
 ### Verifying the Local Stack
 
