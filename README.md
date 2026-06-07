@@ -12,7 +12,7 @@ This repository contains the serverless infrastructure, database schemas, and AP
 - **Data Persistence:** Centrally managed relational database via AWS RDS for all operational data, control tracking, and system state.
 - **File Import/Export Engine:** Dedicated integration with Amazon S3 strictly utilized for importing compliance datasets and exporting generated reports.
 - **Authentication & Access Control:** Native integration with Amazon Cognito User Pools for secure user authentication and session validation.
-- **Automated Testing Framework:** Pytest-based unit test suite with coverage enforced in CI (see `.github/workflows/test.yml`).covering 495 total automated test cases.
+- **Automated Testing Framework:** Pytest-based unit test suite with coverage enforced in CI (see `.github/workflows/test.yml`).
 
 ### Features Not Implemented (Future Scope)
 
